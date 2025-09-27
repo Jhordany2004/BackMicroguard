@@ -7,7 +7,8 @@ const modeloUsuario = new Schema({
     Celular: { type: String, required: true, unique: true },
     Contrasena: { type: String, required: true },
     codigoRecuperacion: { type: String },
-    codigoExpiracion: { type: Date }
+    codigoExpiracion: { type: Date },
+    estado: { type: Boolean, default: true }
 }, { timestamps: true });
 
 module.exports = model('Usuario', modeloUsuario);

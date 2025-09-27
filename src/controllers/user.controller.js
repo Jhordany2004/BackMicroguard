@@ -15,7 +15,8 @@ const registrarUsuario = async (req, res) => {
         if (!Nombres || !Apellidos || !Correo || !Contrasena || !RUC || !Celular || !RazonSocial) {
             console.log("El usuario no ha llenado todos los campos obligatorios");
             return res.status(400).json({
-                message: "Los campos para nombres, apellidos, correo, contraseña, celular, ruc y RazonSocial son obligatorios",
+                message: 
+                "Los campos para nombres, apellidos, correo, contraseña, celular, ruc y RazonSocial son obligatorios",
             });
         }
 
@@ -92,6 +93,13 @@ const loginUsuario = async (req, res) => {
             .json({ message: "Correo y contraseña son obligatorios" });
         }
 
+        const estado = await Usuario.findOne({estado: true });
+        if (!estado) {
+            return res
+                .status(403)
+                .json({ message: "El usuario está inhabilitado, contacte con soporte" });
+        }
+
         const usuario = await Usuario.findOne({ Correo });
         if (!usuario) {
         return res
@@ -164,7 +172,8 @@ const recuperarContraseña = async (req, res) => {
                 from: '"Soporte Microguard" <no-reply@example.com>',
                 to: Correo,
                 subject: "Recuperación de contraseña",
-                html: `<p>Utiliza este código de 4 dígitos para reestablecer tu contraseña: <strong>${Codigo}</strong></p>`,
+                html: `<p>Utiliza este código de 4 dígitos para reestablecer tu contraseña: 
+                <strong>${Codigo}</strong></p>`,
             });       
 
         res.status(200).json({ message: "Correo de recuperación enviado" });
