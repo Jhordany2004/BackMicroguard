@@ -1,6 +1,7 @@
 const Cliente = require("../models/customer.model");
 const Tienda = require("../models/store.model");
 
+
 const registrarCliente = async (req, res) => {
     try {
         const { documento, nombre, apellido } = req.body;
@@ -58,7 +59,6 @@ const registrarCliente = async (req, res) => {
     }
 };
 
-// Obtener todos los proveedores activos de la tienda del usuario autenticado
 const listarCliente = async (req, res) => {
     try {
         const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
@@ -75,7 +75,6 @@ const listarCliente = async (req, res) => {
     }
 };
 
-// Obtener todos los proveedores activos de la tienda del usuario autenticado
 const obtenerCliente = async (req, res) => {
     try {
         const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
@@ -92,7 +91,6 @@ const obtenerCliente = async (req, res) => {
     }
 };
 
-// Deshabilitar proveedor (cambiar estado a false)
 const deshabilitarCliente = async (req, res) => {
     try {
         const { id } = req.body;
@@ -111,7 +109,6 @@ const deshabilitarCliente = async (req, res) => {
     }
 };
 
-// Deshabilitar proveedor (cambiar estado a false)
 const habilitarCliente = async (req, res) => {
     try {
         const { id } = req.body;
@@ -130,7 +127,6 @@ const habilitarCliente = async (req, res) => {
     }
 };
 
-// Obtener proveedor activo por documento o razón social
 const obtenerPorDocumentoYNombre = async (req, res) => {
     try {
         const { documento, nombre } = req.body;
