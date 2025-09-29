@@ -1,5 +1,7 @@
 const Usuario = require("../models/user.model");
 const Store = require("../models/store.model");
+const MetodoPago = require("../models/payment.model");
+const Categoria = require("../models/category.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
@@ -63,8 +65,63 @@ const registrarUsuario = async (req, res) => {
         });
         await nuevoStore.save();
 
+        const metodos = [
+            { nombre: "Efectivo", estado: true },
+            { nombre: "Yape", estado: true },
+            { nombre: "Plin", estado: true },
+            { nombre: "Transferencia", estado: false }
+        ];
+
+        let metodosCreados = 0;
+        for (const metodo of metodos) {
+            try {
+                const nuevoMetodo = new MetodoPago({
+                    nombre: metodo.nombre,
+                    estado: metodo.estado,
+                    Tienda: nuevoStore._id,
+                });
+                await nuevoMetodo.save();
+                metodosCreados++;
+            } catch (error) {
+                console.log(`No se pudo crear el método de pago ${metodo.nombre}: ${error.message}`);
+            }
+        }
+
+        const mensajeMetodos = metodosCreados === metodos.length
+            ? "Todos los métodos de pago fueron creados correctamente"
+            : `Se crearon ${metodosCreados} de ${metodos.length} métodos de pago`;
+
+        const categorias = [
+            { nombre: "Abarrotes", descripcion: "Productos de primera necesidad y alimentos básicos" },
+            { nombre: "Bebidas", descripcion: "Todo tipo de bebidas, gaseosas, jugos y agua" },
+            { nombre: "Limpieza", descripcion: "Productos para limpieza y aseo" },
+            { nombre: "Snacks", descripcion: "Productos para picar y snacks" },
+            { nombre: "Otros", descripcion: "Categoría para productos varios" }
+        ];
+
+        let categoriasCreadas = 0;
+        for (const categoria of categorias) {
+            try {
+                const nuevaCategoria = new Categoria({
+                    nombre: categoria.nombre,
+                    descripcion: categoria.descripcion,
+                    Tienda: nuevoStore._id,
+                });
+                await nuevaCategoria.save();
+                categoriasCreadas++;
+            } catch (error) {
+                console.log(`No se pudo crear la categoría ${categoria.nombre}: ${error.message}`);
+            }
+        }
+
+        const mensajeCategorias = categoriasCreadas === categorias.length
+            ? "Todas las categorías fueron creadas correctamente"
+            : `Se crearon ${categoriasCreadas} de ${categorias.length} categorías`;
+
         return res.status(201).json({
             message: "Usuario y tienda registrados correctamente",
+            metodosPago: mensajeMetodos,
+            categorias: mensajeCategorias,
             usuario: {
                 Nombres: nuevoUsuario.Nombres,
                 Apellidos: nuevoUsuario.Apellidos,
