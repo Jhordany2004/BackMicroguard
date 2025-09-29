@@ -62,7 +62,6 @@ const registrarProveedor = async (req, res) => {
     }
 };
 
-// Obtener todos los proveedores activos de la tienda del usuario autenticado
 const listarProveedores = async (req, res) => {
     try {
         const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
@@ -79,7 +78,6 @@ const listarProveedores = async (req, res) => {
     }
 };
 
-// Obtener todos los proveedores activos de la tienda del usuario autenticado
 const obtenerProveedores = async (req, res) => {
     try {
         const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
@@ -96,7 +94,6 @@ const obtenerProveedores = async (req, res) => {
     }
 };
 
-// Deshabilitar proveedor (cambiar estado a false)
 const deshabilitarProveedor = async (req, res) => {
     try {
         const { id } = req.body;
@@ -115,7 +112,6 @@ const deshabilitarProveedor = async (req, res) => {
     }
 };
 
-// Deshabilitar proveedor (cambiar estado a false)
 const habilitarProveedor = async (req, res) => {
     try {
         const { id } = req.body;
@@ -134,7 +130,6 @@ const habilitarProveedor = async (req, res) => {
     }
 };
 
-// Obtener proveedor activo por documento o razón social
 const obtenerPorDocumentoYRazonSocial = async (req, res) => {
     try {
         const { documento, razonSocial } = req.body;
@@ -192,7 +187,6 @@ const editarProveedor = async (req, res) => {
     }
 };
 
-// Exportación de módulos
 module.exports = {
     registrarProveedor,
     obtenerProveedores,

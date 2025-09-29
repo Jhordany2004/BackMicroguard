@@ -2,6 +2,7 @@ const Usuario = require("../models/user.model");
 const Store = require("../models/store.model");
 const MetodoPago = require("../models/payment.model");
 const Categoria = require("../models/category.model");
+const Configuracion = require("../models/config.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
@@ -64,6 +65,13 @@ const registrarUsuario = async (req, res) => {
             RazonSocial,
         });
         await nuevoStore.save();
+
+        const nuevaConfig = new Configuracion({
+            stockminimo: "10",
+            diasporvencer: "7",
+            Tienda: nuevoStore._id,
+        });
+        await nuevaConfig.save();
 
         const metodos = [
             { nombre: "Efectivo", estado: true },
@@ -139,7 +147,6 @@ const registrarUsuario = async (req, res) => {
     }
 };
 
-//Login usuario
 const loginUsuario = async (req, res) => {
     try {
         const { Correo, Contrasena } = req.body;
@@ -204,7 +211,6 @@ const loginUsuario = async (req, res) => {
     }
 };
 
-//Recuperar Contraseña
 const recuperarContraseña = async (req, res) => {
     const { Correo } = req.body;
 
@@ -241,7 +247,6 @@ const recuperarContraseña = async (req, res) => {
     }
 };
 
-//Cerrar sesion
 const cerrarSesion = async (req, res) => {
     try {
         return res.status(200).json({ message: "Sesión cerrada exitosamente" });
@@ -252,7 +257,6 @@ const cerrarSesion = async (req, res) => {
     }
 };
 
-//Restasblecer Contraseña
 const restablecerContraseña = async (req, res) => {
     const { nuevaContrasena, Codigo, Correo } = req.body;
 
@@ -276,7 +280,6 @@ const restablecerContraseña = async (req, res) => {
     res.status(200).json({ message: "Contraseña actualizada correctamente" });
 };
 
-//VerificarRuc
 const verificarRuc = async (req, res) => {
     const { ruc } = req.body;
     if (!ruc) {
