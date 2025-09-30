@@ -120,10 +120,10 @@ const registrarCompra = async (req, res) => {
         let nuevaCompra;
         try {
             nuevaCompra = new Compra({
-                usuario,
-                proveedor,
+                Usuario: usuario,
+                Proveedor: proveedor,
                 precioTotal,
-                lotes: lotesCompra
+                Lotes: lotesCompra
             });
             await nuevaCompra.save();
         } catch (error) {
