@@ -20,6 +20,5 @@ router.post('/obtener', verificarToken, obtenerCliente);
 router.post('/deshabilitar', verificarToken, deshabilitarCliente);
 router.post('/habilitar', verificarToken, habilitarCliente);
 router.post('/buscarsegun', verificarToken, obtenerPorDocumentoYNombre);
-//HOLA
 
 module.exports = router;
