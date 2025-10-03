@@ -36,10 +36,9 @@ async function startServer() {
     try {
         await connectDB();
 
-        app.listen(5000, () => {
-        console.log(
-            `> Servidor local (Para desarrollo): http://localhost:${5000}`
-        );
+        const PORT = process.env.PORT || 5000;
+        app.listen(PORT, () => {
+            console.log(`Servidor corriendo en el puerto ${PORT}`);
         });
     } catch (error) {
         console.error("Error al iniciar el servidor:", error);
