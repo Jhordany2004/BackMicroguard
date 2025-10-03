@@ -13,9 +13,9 @@ const fetch = require('node-fetch');
 
 const registrarUsuario = async (req, res) => {
     try {
-        const { Nombres, Apellidos, Correo, Celular, Contrasena, RUC, RazonSocial } = req.body;
+        const { Nombres, Apellidos, Correo, Celular, Contrasena, RUC, RazonSocial} = req.body;
 
-        if (!Nombres || !Apellidos || !Correo || !Contrasena || !RUC || !Celular || !RazonSocial) {
+        if (!Nombres || !Apellidos || !Correo || !Contrasena || !RUC || !Celular || !RazonSocial ) {
             console.log("El usuario no ha llenado todos los campos obligatorios");
             return res.status(400).json({
                 message: 
@@ -56,6 +56,7 @@ const registrarUsuario = async (req, res) => {
             Correo,
             Celular,
             Contrasena: hashedPassword,
+            fcmTokens: []         
         });
         await nuevoUsuario.save();
 
@@ -68,7 +69,7 @@ const registrarUsuario = async (req, res) => {
 
         const nuevaConfig = new Configuracion({
             stockminimo: "10",
-            diasporvencer: "7",
+            diasAlertaVencimiento: "7",
             Tienda: nuevoStore._id,
         });
         await nuevaConfig.save();
@@ -149,15 +150,15 @@ const registrarUsuario = async (req, res) => {
 
 const loginUsuario = async (req, res) => {
     try {
-        const { Correo, Contrasena } = req.body;
+        const { Correo, Contrasena, fcmToken } = req.body;
 
         if (!Correo || !Contrasena) {
-        return res
-            .status(400)
-            .json({ message: "Correo y contraseña son obligatorios" });
+            return res
+                .status(400)
+                .json({ message: "Correo y contraseña son obligatorios" });
         }
 
-        const estado = await Usuario.findOne({estado: true });
+        const estado = await Usuario.findOne({ estado: true, Correo });
         if (!estado) {
             return res
                 .status(403)
@@ -166,16 +167,24 @@ const loginUsuario = async (req, res) => {
 
         const usuario = await Usuario.findOne({ Correo });
         if (!usuario) {
-        return res
-            .status(400)
-            .json({ message: "Correo o contraseña incorrectos" });
+            return res
+                .status(400)
+                .json({ message: "Correo incorrecto" });
         }
 
         const esValida = await bcrypt.compare(Contrasena, usuario.Contrasena);
         if (!esValida) {
-        return res
-            .status(401)
-            .json({ message: "Correo o contraseña incorrectos" });
+            return res
+                .status(401)
+                .json({ message: "Contraseña incorrecta" });
+        }
+
+        // Guardar el token FCM si se envía y no está repetido
+        if (fcmToken) {
+            await Usuario.findByIdAndUpdate(
+                usuario._id,
+                { $addToSet: { fcmTokens: fcmToken } } // $addToSet evita duplicados
+            );
         }
 
         const tienda = await Store.findOne({ Usuario: usuario._id });
@@ -189,20 +198,20 @@ const loginUsuario = async (req, res) => {
         };
 
         const token = jwt.sign(
-        {
-            id: usuario._id,
-            correo: usuario.Correo,
-        },
-        process.env.JWT_SECRET || "Secret",
-        {
-            expiresIn: "7d",
-        }
+            {
+                id: usuario._id,
+                correo: usuario.Correo,
+            },
+            process.env.JWT_SECRET || "Secret",
+            {
+                expiresIn: "7d",
+            }
         );
 
         res.status(200).json({
-        message: "Se ha iniciado sesión exitosamente",
-        token,
-        usuario: usuarios,
+            message: "Se ha iniciado sesión exitosamente",
+            token,
+            usuario: usuarios,
         });
     } catch (error) {
         const errorMessage = error.message || "Error iniciando sesión";

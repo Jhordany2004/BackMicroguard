@@ -38,12 +38,9 @@ const registrarCompra = async (req, res) => {
                 FechaVencimiento
             } = detalle;
 
-            // Generar código único si no se envía
             if (!CodigoBarras || CodigoBarras.trim() === "") {
                 CodigoBarras = crypto.randomBytes(8).toString('hex');
-            }
-
-            // Si no es perecible, la fecha de vencimiento es null
+            }            
             if (!Perecible) {
                 FechaVencimiento = "";
             }
@@ -93,7 +90,7 @@ const registrarCompra = async (req, res) => {
                     fechaIngreso: FechaIngreso,
                     fechaVencimiento: FechaVencimiento,
                     Producto: producto._id,
-                    EstadoProducto: "68da265855a7eaf930b8b50e",
+                    EstadoProducto: "68df19298196e9348a65c876",
                 });
                 await nuevoLote.save();
             } catch (error) {

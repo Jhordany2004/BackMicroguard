@@ -8,7 +8,8 @@ const modeloUsuario = new Schema({
     Contrasena: { type: String, required: true },
     codigoRecuperacion: { type: String },
     codigoExpiracion: { type: Date },
-    estado: { type: Boolean, default: true }
+    estado: { type: Boolean, default: true },
+    fcmTokens: [{ type: String }]
 }, { timestamps: true });
 
 module.exports = model('Usuario', modeloUsuario);

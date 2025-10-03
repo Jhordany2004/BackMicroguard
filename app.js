@@ -18,8 +18,7 @@ const metodopagoRoutes = require("./src/routes/payment.routes");
 const estadoproductoRoutes = require("./src/routes/productStatus.routes");
 const purchaseRoutes = require("./src/routes/purchase.routes");
 const ventaRoutes = require("./src/routes/sales.routes");
-//const tipoProductoRoutes = require("./src/routes/productType.routes");
-//const productoRoutes = require("./src/routes/inventory.routes");
+const notificationRoutes = require("./src/routes/notification.routes");
 
 app.use("/usuario", usuarioRoutes);
 app.use("/proveedor", proveedorRoutes);
@@ -29,6 +28,9 @@ app.use("/metodopago", metodopagoRoutes);
 app.use("/estadoproducto", estadoproductoRoutes);
 app.use("/compra", purchaseRoutes);
 app.use("/venta", ventaRoutes);
+app.use("/notificacion", notificationRoutes);
+
+require('./src/jobs/notification.job.js');
 
 async function startServer() {
     try {
