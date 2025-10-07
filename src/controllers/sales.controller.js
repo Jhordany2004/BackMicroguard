@@ -1,5 +1,6 @@
 const Venta = require("../models/sales.model");
 const LoteProducto = require("../models/batch.model");
+const Producto = require("../models/product.model");
 const Cliente = require("../models/customer.model");
 const MetodoPago = require("../models/payment.model");
 const Tienda = require("../models/store.model");
@@ -41,6 +42,11 @@ const registrarVenta = async (req, res) => {
             await LoteProducto.findByIdAndUpdate(
                 lote,
                 { $inc: { stockActual: -cantidad } }
+            );
+
+            await Producto.findByIdAndUpdate(
+                producto,
+                { $inc: { stockTotal: -cantidad } }
             );
 
             detallesVenta.push({

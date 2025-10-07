@@ -1,7 +1,7 @@
 const { Schema, model } = require('mongoose');
 
 const modeloCompra = new Schema({
-    Usuario: { type: Schema.Types.ObjectId, ref: 'Usuario', required: true },
+    Tienda: { type: Schema.Types.ObjectId, ref: 'Tienda', required: true },
     Proveedor: { type: Schema.Types.ObjectId, ref: 'Proveedor', required: true },
     fechaRegistro: { type: Date, default: Date.now },
     precioTotal: { type: Number, required: true },

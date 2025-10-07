@@ -6,15 +6,42 @@ const enviarNotificaciones = async (req, res) => {
         // Buscar la tienda asociada al usuario autenticado
         const tienda = await Store.findOne({ Usuario: req.usuarioId });
         if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
+            return res.status(404).json({ 
+                success: false,
+                message: "Tienda no encontrada para el usuario" 
+            });
         }
 
         // Llama al servicio de notificaciones con el ID de la tienda
-        await notificarLotesCriticos(tienda._id);
+        const resultado = await notificarLotesCriticos(tienda._id);
 
-        res.json({ message: "Notificaciones enviadas" });
+        if (resultado.lotesNotificados.length > 0) {
+            res.json({
+                success: true,
+                message: "Notificaciones enviadas correctamente",
+                data: {
+                    lotesNotificados: resultado.lotesNotificados,
+                    totalLotes: resultado.lotesNotificados.length,
+                    estadisticas: resultado.estadisticas
+                }
+            });
+        } else {
+            res.json({ 
+                success: true,
+                message: "No hay lotes críticos para notificar",
+                data: {
+                    lotesNotificados: [],
+                    totalLotes: 0
+                }
+            });
+        }
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error en enviarNotificaciones:', error);
+        res.status(500).json({ 
+            success: false,
+            message: "Error al enviar notificaciones",
+            error: error.message 
+        });
     }
 };
 

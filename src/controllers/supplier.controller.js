@@ -19,7 +19,7 @@ const registrarProveedor = async (req, res) => {
             .json({ message: "Los campos Tipo, Documento y Razon Social son obligatorios" });
         }
 
-        if (tipoProveedor != 'Natural' && 'Empresa') {
+        if (tipoProveedor !== 'Natural' &&  tipoProveedor !== 'Empresa') {
         return res
             .status(409)
             .json({ message: "Solo se aceptan tipos de proveedor Natural o Empresa" });

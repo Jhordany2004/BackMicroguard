@@ -117,7 +117,7 @@ const registrarCompra = async (req, res) => {
         let nuevaCompra;
         try {
             nuevaCompra = new Compra({
-                Usuario: usuario,
+                Tienda: tienda._id,
                 Proveedor: proveedor,
                 precioTotal,
                 Lotes: lotesCompra
