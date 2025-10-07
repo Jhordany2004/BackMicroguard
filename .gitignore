@@ -1,2 +1,2 @@
 .env
-src/config/microguard-2025-firebase-adminsdk-fbsvc-2710ac6752.json
+src/config/firebase-service-account.json

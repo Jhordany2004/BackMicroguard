@@ -10,7 +10,7 @@ if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
     });
-    console.log('✅ Firebase Admin inicializado correctamente');
+    console.log(' Firebase Admin inicializado correctamente');
 }
 
 // Exportar la instancia completa de admin
