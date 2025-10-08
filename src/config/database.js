@@ -4,8 +4,8 @@ require('dotenv').config();
 async function connectDB() {
     try {
         await mongoose.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,  
-            useUnifiedTopology: true,  
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
         });
         console.log('> 📊 Conectado exitosamente a MongoDB Atlas');
     } catch (error) {
