@@ -1,4 +1,4 @@
-const EstadoProducto = require('../models/ProductStatus.model');
+const EstadoProducto = require('../models/productStatus.model');
 
 const registrarEstadoProducto = async (req, res) => {
     try {
