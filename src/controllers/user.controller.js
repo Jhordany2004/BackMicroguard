@@ -157,6 +157,12 @@ const loginUsuario = async (req, res) => {
                 .status(400)
                 .json({ message: "Correo y contraseña son obligatorios" });
         }
+        
+        if (!fcmToken) {
+            return res
+                .status(400)
+                .json({ message: "TokenFCM no proporcionado" });
+        }
 
         const estado = await Usuario.findOne({ estado: true, Correo });
         if (!estado) {
@@ -291,21 +297,56 @@ const restablecerContraseña = async (req, res) => {
 
 const verificarRuc = async (req, res) => {
     const { ruc } = req.body;
-    if (!ruc) {
-        return res.status(400).json({ message: 'RUC es requerido' });
+    if (!ruc || !/^\d{11}$/.test(ruc)) {
+        return res.status(400).json({ message: 'RUC debe tener 11 dígitos numéricos' });
     }
-    console.log("El RUC a consultar es:", ruc);
-    
     try {
         const response = await fetch(`https://consultaruc.win/api/ruc/${ruc}`);
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return res.status(502).json({ message: 'Error al consultar el RUC. Respuesta inválida del proveedor.' });
+        }
         const data = await response.json();
         if (data && data.result && data.result.estado) {
-        return res.json({ estado: data.result.estado});
+            return res.json({
+                estado: data.result.estado,
+                RazonSocial: data.result.razon_social
+            });
         } else {
-        return res.status(404).json({ message: 'RUC no encontrado' });
+            return res.status(404).json({ message: 'RUC no encontrado o inválido' });
         }
     } catch (error) {
-        return res.status(500).json({ message: 'Error al consultar el RUC', error: error.message });
+        return res.status(500).json({ message: 'Error interno al consultar el RUC' });
+    }
+};
+
+const verificarDNI = async (req, res) => {
+    const { dni } = req.body;
+    if (!dni || !/^\d{8}$/.test(dni)) {
+        return res.status(400).json({ message: 'DNI debe tener 8 dígitos numéricos' });
+    }
+    try {
+        const apiKey = process.env.API_KEY;
+        const url = `https://dniruc.apisperu.com/api/v1/dni/${dni}?token=${apiKey}`;
+        const response = await fetch(url);
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return res.status(502).json({ message: 'Error al consultar el DNI. Respuesta inválida del proveedor.' });
+        }
+        const data = await response.json();
+
+        if (data && data.success) {
+            const nombreCompleto = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`;
+            return res.json({
+                estado: data.success,                
+                nombreCompleto: nombreCompleto
+            });
+        } else {
+            return res.status(404).json({ message: 'DNI no encontrado o inválido' });
+        }
+    } catch (error) {
+        return res.status(500).json({ message: 'Error interno al consultar el DNI' });
     }
 };
 
@@ -317,4 +358,5 @@ module.exports = {
     restablecerContraseña,
     cerrarSesion,
     verificarRuc,
+    verificarDNI,
 };

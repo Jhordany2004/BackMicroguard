@@ -2,6 +2,7 @@ const express = require('express');
 const {
     registrarUsuario,
     verificarRuc,
+    verificarDNI,
     loginUsuario,
     recuperarContraseña,
     restablecerContraseña,    
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.post('/registro', registrarUsuario);
 router.post('/verificarRuc', verificarRuc);
+router.post('/verificarDni', verificarDNI);
 router.post('/login', loginUsuario);
 router.post('/cerrarSesion', verificarToken, cerrarSesion);
 router.post('/recuperar', recuperarContraseña);

@@ -65,7 +65,7 @@ const listarCliente = async (req, res) => {
         if (!tienda) {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
-        const clienteActivos = await Cliente.find({ Tienda: tienda._id});
+        const clienteActivos = await Cliente.find({ Tienda: tienda._id }).limit(50);
         if (!clienteActivos.length) {
             return res.status(404).json({ message: "No hay clientes activos" });
         }
@@ -81,7 +81,7 @@ const obtenerCliente = async (req, res) => {
         if (!tienda) {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
-        const clienteActivos = await Cliente.find({ Tienda: tienda._id, estado: true });
+        const clienteActivos = await Cliente.find({ Tienda: tienda._id, estado: true }).limit(50);
         if (!clienteActivos.length) {
             return res.status(404).json({ message: "No hay clientes activos o registre uno" });
         }
@@ -192,7 +192,6 @@ const editarCliente = async (req, res) => {
     }
 };
 
-// Exportación de módulos
 module.exports = {
     registrarCliente,
     obtenerCliente,
