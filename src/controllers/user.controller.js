@@ -295,8 +295,13 @@ const recuperarContraseña = async (req, res) => {
         await usuario.save();
 
         const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS,},
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_PASS
+            }
         });
 
         const htmlCorreo = `
