@@ -281,7 +281,7 @@ const recuperarContraseña = async (req, res) => {
         if (!usuario)
             return res.status(404).json({ success: false, message: "No existe un usuario con ese correo" });
 
-        const Codigo = Math.floor(100000 + Math.random() * 900000).toString();
+        const Codigo = Math.floor(1000 + Math.random() * 9000).toString();
 
         const hashCodigo = crypto
             .createHash("sha256")
@@ -296,7 +296,7 @@ const recuperarContraseña = async (req, res) => {
 
         const transporter = nodemailer.createTransport({
             service: "gmail",
-            
+
             auth: {
                 user: "contactomicroguard@gmail.com",
                 pass: "daau aeeu ngbi qxbn" , 
@@ -380,10 +380,10 @@ const restablecerContraseña = async (req, res) => {
         return res.status(404).json({ success: false, message: "Usuario no encontrado" });
         }
 
-        if (!/^\d{6}$/.test(Codigo)) {
+        if (!/^\d{4}$/.tst(Codigo)) {
         return res.status(400).json({
             success: false,
-            message: "El código debe tener 6 dígitos",
+            message: "El código debe tener 4 dígitos",
         });
         }
 
