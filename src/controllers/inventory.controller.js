@@ -9,9 +9,7 @@ const Tienda = require("../models/store.model");
 const Configuracion = require("../models/config.model");
 const { calcularEstadoLote, obtenerLotesConEstado, obtenerResumenEstados } = require("../services/loteStatus.service");
 
-/**
- * GET /inventario - Obtener todos los lotes con estados calculados
- */
+
 const obtenerInventarioCompleto = async (req, res) => {
     try {
         const usuario = req.usuarioId;
@@ -63,9 +61,7 @@ const obtenerInventarioCompleto = async (req, res) => {
     }
 };
 
-/**
- * GET /inventario/alertas - Obtener solo lotes con problemas (vencidos, bajo stock, próximo vencer)
- */
+
 const obtenerAlertasInventario = async (req, res) => {
     try {
         const usuario = req.usuarioId;
@@ -109,9 +105,7 @@ const obtenerAlertasInventario = async (req, res) => {
     }
 };
 
-/**
- * GET /inventario/producto/:id - Obtener todos los lotes de un producto específico
- */
+
 const obtenerLotesProducto = async (req, res) => {
     try {
         const { id } = req.params;
@@ -122,11 +116,9 @@ const obtenerLotesProducto = async (req, res) => {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
 
-        // Obtener configuración de la tienda para diasAlertaVencimiento
         const config = await Configuracion.findOne({ Tienda: tienda._id });
         const diasAlerta = config?.diasAlertaVencimiento || 7;
 
-        // Verificar que el producto pertenece a la tienda
         const producto = await Producto.findById(id);
         if (!producto || producto.Tienda.toString() !== tienda._id.toString()) {
             return res.status(404).json({ message: "Producto no encontrado en tu tienda" });
@@ -159,10 +151,7 @@ const obtenerLotesProducto = async (req, res) => {
     }
 };
 
-/**
- * GET /inventario/estado/:estado - Filtrar lotes por estado específico
- * Estados: ACEPTABLE, BAJO_STOCK, PROXIMO_VENCER, VENCIDO, AGOTADO
- */
+
 const obtenerLotesPorEstado = async (req, res) => {
     try {
         const { estado } = req.params;
@@ -212,9 +201,7 @@ const obtenerLotesPorEstado = async (req, res) => {
     }
 };
 
-/**
- * GET /inventario/estadisticas - Obtener estadísticas generales del inventario
- */
+
 const obtenerEstadisticasInventario = async (req, res) => {
     try {
         const usuario = req.usuarioId;

@@ -21,4 +21,4 @@ router.post('/cerrarSesion', verificarToken, cerrarSesion);
 router.post('/recuperar', recuperarContraseña);
 router.post('/restablecer', restablecerContraseña);
 
-module.exports = router;    
+module.exports = router;        

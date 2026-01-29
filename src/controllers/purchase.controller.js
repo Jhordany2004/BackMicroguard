@@ -3,7 +3,7 @@ const Proveedor = require("../models/supplier.model");
 const Producto = require("../models/product.model");
 const LoteProducto = require("../models/batch.model");
 const Tienda = require("../models/store.model");
-const crypto = require('crypto'); // Para generar código único
+const crypto = require('crypto'); 
 
 
 const registrarCompra = async (req, res) => {

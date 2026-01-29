@@ -298,8 +298,8 @@ const recuperarContraseña = async (req, res) => {
             service: "gmail",
 
             auth: {
-                user: "contactomicroguard@gmail.com",
-                pass: "daau aeeu ngbi qxbn" , 
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_PASS, 
             }
         });
 
