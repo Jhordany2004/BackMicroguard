@@ -21,7 +21,7 @@ const registrarCompra = async (req, res) => {
         }
 
         let precioTotal = 0;
-        let lotesCompra = [];
+        let detallesCompra = [];
 
         for (const [i, detalle] of detalles.entries()) {
             let {
@@ -89,8 +89,7 @@ const registrarCompra = async (req, res) => {
                     precioVenta: PrecioVentaUnidad,
                     fechaIngreso: FechaIngreso,
                     fechaVencimiento: FechaVencimiento,
-                    Producto: producto._id,
-                    EstadoProducto: "68df19298196e9348a65c876",
+                    Producto: producto._id,                    
                 });
                 await nuevoLote.save();
             } catch (error) {
@@ -107,20 +106,32 @@ const registrarCompra = async (req, res) => {
                 return res.status(500).json({ message: `Error al actualizar stock en el detalle #${i + 1}: ${error.message}` });
             }
 
-            // Agregar lote a la compra
-            lotesCompra.push(nuevoLote._id);
+            // Agregar detalle a la compra con denormalización mínima
+            const precioTotalDetalle = CantidadComprada * PrecioCompraUnidad;
+            detallesCompra.push({
+                lote: nuevoLote._id,
+                cantidadComprada: CantidadComprada,
+                precioUnitario: PrecioCompraUnidad,
+                precioTotal: precioTotalDetalle,
+                producto: {
+                    productoId: producto._id,
+                    nombre: producto.nombre,
+                    medida: producto.medida,
+                    codigoBarras: producto.codigoBarras
+                }
+            });
 
-            precioTotal += CantidadComprada * PrecioCompraUnidad;
+            precioTotal += precioTotalDetalle;
         }
 
-        // Crear la compra con array de lotes
+        // Crear la compra con detalles embebidos
         let nuevaCompra;
         try {
             nuevaCompra = new Compra({
                 Tienda: tienda._id,
                 Proveedor: proveedor,
                 precioTotal,
-                Lotes: lotesCompra
+                detalles: detallesCompra
             });
             await nuevaCompra.save();
         } catch (error) {

@@ -30,15 +30,13 @@ const registrarMetodoPago = async (req, res) => {
         });
         await metodoPago.save();
 
-        res.status(201).json({
+        return res.status(201).json({
         message: "Metodo de pago registrado exitosamente",
         nombre,
         Tienda: tienda._id        
         });
-    } catch (error) {
-        const errorMessage = error.message || "Error al registrar el metodo de pago";
-        console.log("Error Back-End:", errorMessage);
-        res.status(500).json({ message: errorMessage });
+    } catch (error) {            
+        return res.status(500).json({ message: error.message || "Error al registrar el metodo de pago" });
     }
 };
 
@@ -52,9 +50,14 @@ const listarMetodoPago = async (req, res) => {
         if (!metodoActivo.length) {
             return res.status(404).json({ message: "No hay metodos de pago activos" });
         }
-        res.json(metodoActivo);
+
+        return res.status(200).json({
+            success: true,
+            message: "Metodos de pago obtenidos exitosamente",
+            data: metodoActivo
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al obtener metodos de pago" });
+        return res.status(500).json({ message: error.message || "Error al listar metodos de pago" });
     }
 };
 
@@ -68,9 +71,13 @@ const obtenerMetodoPago = async (req, res) => {
         if (!metodoActivo.length) {
             return res.status(404).json({ message: "No hay metodos de pago activo o registre uno" });
         }
-        res.json(metodoActivo);
+        return res.status(200).json({
+            success: true,
+            message: "Metodos de pago activos obtenidos exitosamente",
+            data: metodoActivo
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al obtener metodos de pago" });
+        return res.status(500).json({ message: error.message || "Error al obtener metodos de pago" });
     }
 };
 

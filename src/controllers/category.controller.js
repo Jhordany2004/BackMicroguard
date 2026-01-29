@@ -80,15 +80,16 @@ const obtenerCategoria = async (req, res) => {
 
 const editarCategoria = async (req, res) => {
     try {        
-        const { id, nombre, descripcion } = req.body;
+        const { id } = req.params;
+        const { nombre, descripcion } = req.body;
 
-        // Opcional: Validar campos únicos si se modifican
+        // Validar que ID sea válido
         const categoriaExistente = await Categoria.findById(id);
         if (!categoriaExistente) {
             return res.status(404).json({ message: "Categoria no encontrado" });
         }
 
-         // Validar razonSocial único si se modifica
+         // Validar nombre único si se modifica
         if (nombre && nombre !== categoriaExistente.nombre) {
             const existeNom = await Categoria.findOne({ nombre });
             if (existeNom) {
@@ -109,7 +110,7 @@ const editarCategoria = async (req, res) => {
 
 const deshabilitarCategoria = async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id } = req.params;
         const categoria = await Categoria.findById(id);
         if (!categoria) {
             return res.status(404).json({ message: "Categoria no encontrado" });
@@ -127,7 +128,7 @@ const deshabilitarCategoria = async (req, res) => {
 
 const habilitarCategoria = async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id } = req.params;
         const categoria = await Categoria.findById(id);
         if (!categoria) {
             return res.status(404).json({ message: "Categoria no encontrado" });

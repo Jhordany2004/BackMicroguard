@@ -11,6 +11,6 @@ const modeloProveedor = new Schema({
 
 modeloProveedor.index({ documento: 1, Tienda: 1 }, { unique: true });
 modeloProveedor.index({ razonSocial: 1, Tienda: 1 }, { unique: true });
-modeloProveedor.index({ telefono: 1, Tienda: 1 }, { unique: true });
+modeloProveedor.index({ Tienda: 1, estado: 1, createdAt: -1 });
 
 module.exports = model('Proveedor', modeloProveedor);

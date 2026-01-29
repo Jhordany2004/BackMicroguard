@@ -11,6 +11,6 @@ const modeloCliente = new Schema({
 
 modeloCliente.index({ documento: 1, Tienda: 1 }, { unique: true });
 modeloCliente.index({ nombre: 1, apellido: 1, Tienda: 1 }, { unique: true });
-modeloCliente.index({ telefono: 1, Tienda: 1 }, { unique: true });
+modeloCliente.index({ Tienda: 1, estado: 1, createdAt: -1 });
 
 module.exports = model('Cliente', modeloCliente);

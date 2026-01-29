@@ -15,5 +15,9 @@ const modeloProducto = new Schema({
 
 // Índices compuestos para unicidad por tienda
 modeloProducto.index({ nombre: 1, codigoBarras: 1, Tienda: 1 }, { unique: true });
+// Índices para búsquedas y filtrados rápidos
+modeloProducto.index({ Tienda: 1, estado: 1 });
+modeloProducto.index({ Tienda: 1, codigoBarras: 1 });
+modeloProducto.index({ Tienda: 1, Categoria: 1, estado: 1 });
 
 module.exports = model('Producto', modeloProducto);

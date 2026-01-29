@@ -17,4 +17,9 @@ const modeloVenta = new Schema({
     detalles: [detalleVentaSchema]
 }, { timestamps: true });
 
+// Índices para búsquedas rápidas
+modeloVenta.index({ Tienda: 1, fechaRegistro: -1, estado: 1 });
+modeloVenta.index({ Tienda: 1, Cliente: 1, fechaRegistro: -1 });
+modeloVenta.index({ Cliente: 1, Tienda: 1 });
+
 module.exports = model('Venta', modeloVenta);

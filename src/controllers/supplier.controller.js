@@ -72,7 +72,11 @@ const listarProveedores = async (req, res) => {
         if (!proveedoresActivos.length) {
             return res.status(404).json({ message: "No hay proveedores activos" });
         }
-        res.json(proveedoresActivos);
+        return res.status(200).json({
+            success: true,
+            message: "Lista de proveedores obtenidos exitosamente",
+            data: proveedoresActivos
+        });
     } catch (error) {
         res.status(500).json({ message: error.message || "Error al obtener proveedores" });
     }
@@ -84,11 +88,37 @@ const obtenerProveedores = async (req, res) => {
         if (!tienda) {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
-        const proveedoresActivos = await Proveedor.find({ Tienda: tienda._id, estado: true });
+        const proveedoresActivos = await Proveedor.find({ Tienda: tienda._id , estado: true});
         if (!proveedoresActivos.length) {
             return res.status(404).json({ message: "No hay proveedores activos" });
         }
-        res.json(proveedoresActivos);
+        return res.status(200).json({
+            success: true,
+            message: "Proveedores activos obtenidos exitosamente",
+            data: proveedoresActivos
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message || "Error al obtener proveedores" });
+    }
+};
+
+const obtenerProveedorPorID = async (req, res) => {
+    try {
+        const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
+        const {id} = req.params;
+        if (!tienda) {
+            return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
+        }
+
+        const proveedor = await Proveedor.find({ _id: id, Tienda: tienda._id, estado: true });
+        if (!proveedor.length) {
+            return res.status(404).json({ message: "No hay proveedores activos con ese ID" });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Proveedor encontrado",
+            data: proveedor
+        });
     } catch (error) {
         res.status(500).json({ message: error.message || "Error al obtener proveedores" });
     }
@@ -96,7 +126,7 @@ const obtenerProveedores = async (req, res) => {
 
 const deshabilitarProveedor = async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id } = req.params;
         const proveedor = await Proveedor.findById(id);
         if (!proveedor) {
             return res.status(404).json({ message: "Proveedor no encontrado" });
@@ -106,7 +136,12 @@ const deshabilitarProveedor = async (req, res) => {
         }
         proveedor.estado = false;
         await proveedor.save();
-        res.json({ message: "Proveedor deshabilitado", proveedor });
+
+        return res.status(200).json({
+            success: true,
+            message: "Proveedor deshabilitado",
+            data: proveedor
+        });
     } catch (error) {
         res.status(500).json({ message: error.message || "Error al deshabilitar proveedor" });
     }
@@ -114,7 +149,7 @@ const deshabilitarProveedor = async (req, res) => {
 
 const habilitarProveedor = async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id } = req.params;
         const proveedor = await Proveedor.findById(id);
         if (!proveedor) {
             return res.status(404).json({ message: "Proveedor no encontrado" });
@@ -124,7 +159,12 @@ const habilitarProveedor = async (req, res) => {
         }
         proveedor.estado = true;
         await proveedor.save();
-        res.json({ message: "Proveedor habilitado", proveedor });
+
+        return res.status(200).json({
+            success: true,
+            message: "Proveedor habilitado",
+            data: proveedor
+        });
     } catch (error) {
         res.status(500).json({ message: error.message || "Error al habilitar proveedor" });
     }
@@ -132,7 +172,7 @@ const habilitarProveedor = async (req, res) => {
 
 const obtenerPorDocumentoYRazonSocial = async (req, res) => {
     try {
-        const { documento, razonSocial } = req.body;
+        const { documento, razonSocial } = req.query;
         const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
         if (!tienda) {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
@@ -145,7 +185,11 @@ const obtenerPorDocumentoYRazonSocial = async (req, res) => {
         if (!proveedoresActivos.length) {
             return res.status(404).json({ message: "No hay proveedores activos con esos datos" });
         }
-        res.json(proveedoresActivos);
+        return res.status(200).json({
+            success: true,
+            message: "Proveedor encontrado",
+            data: proveedoresActivos
+        });
     } catch (error) {
         res.status(500).json({ message: error.message || "Error al buscar proveedor" });
     }
@@ -153,9 +197,10 @@ const obtenerPorDocumentoYRazonSocial = async (req, res) => {
 
 const editarProveedor = async (req, res) => {
     try {        
-        const { id, razonSocial, telefono } = req.body;
+        const { id } = req.params;
+        const { razonSocial, telefono } = req.body;
 
-        // Opcional: Validar campos únicos si se modifican
+        // Validar que ID sea válido
         const proveedorExistente = await Proveedor.findById(id);
         if (!proveedorExistente) {
             return res.status(404).json({ message: "Proveedor no encontrado" });
@@ -181,7 +226,11 @@ const editarProveedor = async (req, res) => {
 
         await proveedorExistente.save();
 
-        res.json({ message: "Proveedor editado exitosamente", proveedor: proveedorExistente });
+        return res.status(200).json({
+            success: true,
+            message: "Proveedor editado exitosamente",
+            data: proveedorExistente
+        });
     } catch (error) {
         res.status(500).json({ message: error.message || "Error al editar proveedor" });
     }
@@ -190,6 +239,7 @@ const editarProveedor = async (req, res) => {
 module.exports = {
     registrarProveedor,
     obtenerProveedores,
+    obtenerProveedorPorID,
     listarProveedores,
     deshabilitarProveedor,
     habilitarProveedor,

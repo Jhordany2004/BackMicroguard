@@ -93,7 +93,7 @@ const obtenerCliente = async (req, res) => {
 
 const deshabilitarCliente = async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id } = req.params;
         const cliente = await Cliente.findById(id);
         if (!cliente) {
             return res.status(404).json({ message: "Cliente no encontrado" });
@@ -111,7 +111,7 @@ const deshabilitarCliente = async (req, res) => {
 
 const habilitarCliente = async (req, res) => {
     try {
-        const { id } = req.body;
+        const { id } = req.params;
         const cliente = await Cliente.findById(id);
         if (!cliente) {
             return res.status(404).json({ message: "Cliente no encontrado" });
@@ -129,7 +129,7 @@ const habilitarCliente = async (req, res) => {
 
 const obtenerPorDocumentoYNombre = async (req, res) => {
     try {
-        const { documento, nombre } = req.body;
+        const { documento, nombre } = req.query;
         const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
         if (!tienda) {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
@@ -150,22 +150,23 @@ const obtenerPorDocumentoYNombre = async (req, res) => {
 
 const editarCliente = async (req, res) => {
     try {        
-        const { id, nombre, apellido, telefono } = req.body;
+        const { id } = req.params;
+        const { nombre, apellido, telefono } = req.body;
 
-        // Opcional: Validar campos únicos si se modifican
+        // Validar que ID sea válido
         const clienteExistente = await Cliente.findById(id);
         if (!clienteExistente) {
             return res.status(404).json({ message: "Cliente no encontrado" });
         }
 
-         // Validar razonSocial único si se modifica
+         // Validar nombre único si se modifica
         if (nombre && nombre !== clienteExistente.nombre) {
             const existeNom = await Cliente.findOne({ nombre });
             if (existeNom) {
                 return res.status(409).json({ message: "Ya existe un cliente con este nombre" });
             }
         }
-        // Validar telefono único si se modifica
+        // Validar apellido único si se modifica
         if (apellido && apellido !== clienteExistente.apellido) {
             const existeApel = await Cliente.findOne({ apellido });
             if (existeApel) {

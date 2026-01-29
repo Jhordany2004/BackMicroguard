@@ -1,7 +1,9 @@
 const Operacion = require("../models/operation.model");
 const Tienda = require("../models/store.model");
 const LoteProducto = require("../models/batch.model");
+const Producto = require("../models/product.model");
 
+//Se ejecuta para registrar una operacion de un lote (producto) , para el control del inventario.
 const registrarOperacion = async (req, res) => {
     try {
         const { razon, descripcion, cantidad, LoteProducto: loteId } = req.body;
@@ -16,25 +18,41 @@ const registrarOperacion = async (req, res) => {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
 
-        const lote = await LoteProducto.findById(loteId);
+        const lote = await LoteProducto.findById(loteId).populate('Producto');
         if (!lote) {
             return res.status(404).json({ message: "Lote de producto no encontrado" });
         }
+
+        // Obtener datos del producto para denormalización
+        const producto = lote.Producto || {};
 
         const nuevaOperacion = new Operacion({
             razon,
             descripcion,
             cantidad,
             Tienda: tienda._id,
-            LoteProducto: loteId,
+            lote: {
+                loteId: lote._id,
+                producto: {
+                    productoId: producto._id,
+                    nombre: producto.nombre,
+                    medida: producto.medida,
+                    codigoBarras: producto.codigoBarras
+                }
+            },
             estado: true
         });
 
         await nuevaOperacion.save();
 
-        res.status(201).json({ message: "Operación registrada correctamente", operacion: nuevaOperacion });
+        return res.status(201).json({
+            success: true,
+            message: "Operación registrada correctamente",
+            data: nuevaOperacion
+        });
+
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al registrar operación" });
+        return res.status(500).json({ message: error.message || "Error al registrar operación" });
     }
 };
 
