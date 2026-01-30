@@ -40,16 +40,19 @@ async function startServer() {
         iniciarCronNotificaciones();
 
         // Iniciar servidor
-        const PORT = process.env.PORT || 5000;
-        app.listen(PORT, () => {
-            console.log(`\n ====================================`);
-            console.log(`   Servidor corriendo en puerto http://localhost:${PORT}/`);
-            console.log(`   Zona horaria: America/Lima (UTC-5)`);
-            console.log(`   Notificaciones: 6:00 AM diarias`);
+        const PORT = process.env.PORT || 8080;
+        const HOST = '0.0.0.0'; // ⬅️ Añadir esto para hosting
+        
+        app.listen(PORT, HOST, () => { // ⬆️ Añadir HOST aquí
+            console.log(`\n====================================`);
+            console.log(`   ✅ Servidor corriendo en puerto ${PORT}`);
+            console.log(`   🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`   🕐 Zona horaria: America/Lima (UTC-5)`);
+            console.log(`   🔔 Notificaciones: 6:00 AM diarias`);
             console.log(`====================================\n`);
         });
     } catch (error) {
-        console.error(" Error al iniciar el servidor:", error);
+        console.error("Error al iniciar el servidor:", error);
         process.exit(1);
     }
 }
