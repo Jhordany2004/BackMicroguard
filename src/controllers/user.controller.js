@@ -9,7 +9,8 @@ const dotenv = require("dotenv");
 const nodemailer = require('nodemailer');
 const crypto = require("crypto");
 const fetch = require('node-fetch');
-const { handleError } = require("../helpers/error.helpers");
+const handleError  = require("../helpers/error.helpers");
+const transporter = require('../config/mailer');
 
 
 const validarPassword = (password) => {
@@ -294,15 +295,6 @@ const recuperarContraseña = async (req, res) => {
 
         await usuario.save();
 
-        const transporter = nodemailer.createTransport({
-            service: "gmail",
-
-            auth: {
-                user: process.env.GMAIL_USER,
-                pass: process.env.GMAIL_PASS, 
-            }
-        });
-
         const htmlCorreo = `
             <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
                 <div style="max-width: 500px; margin: auto; background-color: #ffffff; border-radius: 8px; padding: 24px;">
@@ -380,7 +372,7 @@ const restablecerContraseña = async (req, res) => {
         return res.status(404).json({ success: false, message: "Usuario no encontrado" });
         }
 
-        if (!/^\d{4}$/.tst(Codigo)) {
+        if (!/^\d{4}$/.test(Codigo)) {
         return res.status(400).json({
             success: false,
             message: "El código debe tener 4 dígitos",
