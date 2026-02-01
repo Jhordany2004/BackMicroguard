@@ -9,7 +9,7 @@ const dotenv = require("dotenv");
 const nodemailer = require('nodemailer');
 const crypto = require("crypto");
 const fetch = require('node-fetch');
-const handleError  = require("../helpers/error.helpers");
+const { handleError } = require('../helpers/handleError.helpers');
 const transporter = require('../config/mailer');
 
 
