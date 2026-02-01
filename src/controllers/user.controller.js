@@ -5,8 +5,6 @@ const Categoria = require("../models/category.model");
 const Configuracion = require("../models/config.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const dotenv = require("dotenv");
-const nodemailer = require('nodemailer');
 const crypto = require("crypto");
 const fetch = require('node-fetch');
 const { handleError } = require('../helpers/handleError.helpers');
@@ -288,7 +286,7 @@ const recuperarContraseña = async (req, res) => {
         if (!usuario)
             return res.status(404).json({ success: false, message: "No existe un usuario con ese correo" });
 
-        const Codigo = Math.floor(1000 + Math.random() * 9000).toString();
+        const Codigo = Math.floor(100000 + Math.random() * 900000).toString();
 
         const hashCodigo = crypto
             .createHash("sha256")
@@ -368,10 +366,10 @@ const restablecerContraseña = async (req, res) => {
         return res.status(404).json({ success: false, message: "Usuario no encontrado" });
         }
 
-        if (!/^\d{4}$/.test(Codigo)) {
+        if (!/^\d{6}$/.test(Codigo)) {
         return res.status(400).json({
             success: false,
-            message: "El código debe tener 4 dígitos",
+            message: "El código debe tener 6 dígitos",
         });
         }
 
