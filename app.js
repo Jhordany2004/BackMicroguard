@@ -45,7 +45,7 @@ async function startServer() {
         
         app.listen(PORT, HOST, () => { // ⬆️ Añadir HOST aquí
             console.log(`\n====================================`);
-            console.log(`   ✅ Servidor corriendo en puerto ${PORT}`);
+            console.log(`   ✅ Servidor corriendo en puerto http://localhost:${PORT}`);
             console.log(`   🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
             console.log(`   🕐 Zona horaria: America/Lima (UTC-5)`);
             console.log(`   🔔 Notificaciones: 6:00 AM diarias`);

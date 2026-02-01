@@ -4,17 +4,16 @@ const dns = require('node:dns');
 dns.setDefaultResultOrder("ipv4first");
 
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    host: process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com",
+    port: Number(process.env.BREVO_SMTP_PORT) || 587,
+    secure: false, // Brevo usa TLS, no SSL
     auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
+        user: process.env.BREVO_SMTP_USER || "apikey",
+        pass: process.env.BREVO_SMTP_PASS, // xsmtpsib-...
     },
     tls: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
     },
-    family: 4,
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 10000,

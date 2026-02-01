@@ -278,6 +278,12 @@ const recuperarContraseña = async (req, res) => {
     const { Correo } = req.body;
 
     try {
+        if (!Correo) {
+            return res.status(400).json({
+                success: false,
+                message: "El correo es obligatorio",
+            });
+        }
         const usuario = await Usuario.findOne({ Correo });
         if (!usuario)
             return res.status(404).json({ success: false, message: "No existe un usuario con ese correo" });
@@ -338,7 +344,7 @@ const recuperarContraseña = async (req, res) => {
             `;
 
         await transporter.sendMail({
-                from: `"Soporte Microguard" <${process.env.GMAIL_USER}>`,
+                from: `"Soporte Microguard" <${process.env.BREVO_SENDER}>`,
                 to: Correo,
                 subject: "Recuperación de contraseña",
                 html: htmlCorreo,                
@@ -353,15 +359,6 @@ const recuperarContraseña = async (req, res) => {
     }
 };
 
-const cerrarSesion = async (req, res) => {
-    try {
-        return res.status(200).json({ success: true, message: "Sesión cerrada exitosamente" });
-    } catch (error) {
-        return handleError(res, error, {
-            message: "Error al cerrar sesión",
-        });
-    }
-};
 
 const restablecerContraseña = async (req, res) => {
     const { nuevaContrasena, Codigo, Correo } = req.body;
@@ -420,6 +417,17 @@ const restablecerContraseña = async (req, res) => {
     }
 };
 
+const cerrarSesion = async (req, res) => {
+    try {
+        return res.status(200).json({ success: true, message: "Sesión cerrada exitosamente" });
+    } catch (error) {
+        return handleError(res, error, {
+            message: "Error al cerrar sesión",
+        });
+    }
+};
+
+
 const verificarRuc = async (req, res) => {
     const { ruc } = req.query;
     if (!ruc || !/^\d{11}$/.test(ruc)) {
@@ -455,7 +463,7 @@ const verificarDNI = async (req, res) => {
         return res.status(400).json({ message: 'DNI debe tener 8 dígitos numéricos' });
     }
     try {
-        const apiKey = process.env.API_KEY;
+        const apiKey = process.env.API_KEY_DNI;
         const url = `https://dniruc.apisperu.com/api/v1/dni/${dni}?token=${apiKey}`;
         const response = await fetch(url);
         
