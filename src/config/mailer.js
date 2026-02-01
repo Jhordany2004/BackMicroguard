@@ -14,18 +14,9 @@ const transporter = nodemailer.createTransport({
     tls: {
         rejectUnauthorized: false,
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-});
-
-// Verificar conexión al inicio
-transporter.verify((error) => {
-    if (error) {
-        console.error('❌ Error en configuración de email:', error);
-    } else {
-        console.log('✉️ Servidor SMTP listo para enviar emails');
-    }
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
 });
 
 module.exports = transporter;
