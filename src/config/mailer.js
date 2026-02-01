@@ -1,22 +1,25 @@
-const nodemailer = require('nodemailer');
-const dns = require('node:dns');
+const axios = require("axios");
 
-dns.setDefaultResultOrder("ipv4first");
+const sendBrevoEmail = async ({ to, subject, html }) => {
+    return axios.post(
+        "https://api.brevo.com/v3/smtp/email",
+        {
+            sender: {
+                email: process.env.BREVO_SENDER,
+                name: "Soporte Microguard",
+            },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+        },
+        {
+            headers: {
+                "api-key": process.env.BREVO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            timeout: 15000,
+        }
+    );
+};
 
-const transporter = nodemailer.createTransport({
-    host: process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com",
-    port: Number(process.env.BREVO_SMTP_PORT) || 587,
-    secure: false, // Brevo usa TLS, no SSL
-    auth: {
-        user: process.env.BREVO_SMTP_USER || "apikey",
-        pass: process.env.BREVO_SMTP_PASS, // xsmtpsib-...
-    },
-    tls: {
-        rejectUnauthorized: false,
-    },
-    connectionTimeout: 20000,
-    greetingTimeout: 20000,
-    socketTimeout: 20000,
-});
-
-module.exports = transporter;
+module.exports = sendBrevoEmail;

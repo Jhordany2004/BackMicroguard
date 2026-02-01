@@ -10,7 +10,7 @@ const nodemailer = require('nodemailer');
 const crypto = require("crypto");
 const fetch = require('node-fetch');
 const { handleError } = require('../helpers/handleError.helpers');
-const transporter = require('../config/mailer');
+const sendBrevoEmail  = require('../config/mailer');
 
 
 const validarPassword = (password) => {
@@ -343,12 +343,11 @@ const recuperarContraseña = async (req, res) => {
             </div>
             `;
 
-        await transporter.sendMail({
-                from: `"Soporte Microguard" <${process.env.BREVO_SENDER}>`,
-                to: Correo,
-                subject: "Recuperación de contraseña",
-                html: htmlCorreo,                
-            });       
+        await sendBrevoEmail({
+            to: Correo,
+            subject: "Recuperación de contraseña",
+            html: htmlCorreo,
+        });     
 
         return res.status(200).json({ success: true, message: "Correo de recuperación enviado" });
 
