@@ -6,7 +6,6 @@
 const LoteProducto = require("../models/batch.model");
 const Producto = require("../models/product.model");
 const Tienda = require("../models/store.model");
-const Configuracion = require("../models/config.model");
 const { calcularEstadoLote, obtenerLotesConEstado, obtenerResumenEstados } = require("../services/loteStatus.service");
 
 
@@ -19,9 +18,8 @@ const obtenerInventarioCompleto = async (req, res) => {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
 
-        // Obtener configuración de la tienda para diasAlertaVencimiento
-        const config = await Configuracion.findOne({ Tienda: tienda._id });
-        const diasAlerta = config?.diasAlertaVencimiento || 7;
+        // Obtener configuración integrada de la tienda para diasAlertaVencimiento
+        const diasAlerta = tienda.diasAlertaVencimiento ?? 7;
 
         // Obtener todos los lotes de los productos de la tienda
         const lotes = await LoteProducto.find()
@@ -71,9 +69,8 @@ const obtenerAlertasInventario = async (req, res) => {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
 
-        // Obtener configuración de la tienda para diasAlertaVencimiento
-        const config = await Configuracion.findOne({ Tienda: tienda._id });
-        const diasAlerta = config?.diasAlertaVencimiento || 7;
+        // Obtener configuración integrada de la tienda para diasAlertaVencimiento
+        const diasAlerta = tienda.diasAlertaVencimiento ?? 7;
 
         const lotes = await LoteProducto.find()
             .populate({
@@ -116,8 +113,7 @@ const obtenerLotesProducto = async (req, res) => {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
 
-        const config = await Configuracion.findOne({ Tienda: tienda._id });
-        const diasAlerta = config?.diasAlertaVencimiento || 7;
+        const diasAlerta = tienda.diasAlertaVencimiento ?? 7;
 
         const producto = await Producto.findById(id);
         if (!producto || producto.Tienda.toString() !== tienda._id.toString()) {
@@ -162,9 +158,8 @@ const obtenerLotesPorEstado = async (req, res) => {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
 
-        // Obtener configuración de la tienda para diasAlertaVencimiento
-        const config = await Configuracion.findOne({ Tienda: tienda._id });
-        const diasAlerta = config?.diasAlertaVencimiento || 7;
+        // Obtener configuración integrada de la tienda para diasAlertaVencimiento
+        const diasAlerta = tienda.diasAlertaVencimiento ?? 7;
 
         const estadosValidos = ['ACEPTABLE', 'BAJO_STOCK', 'PROXIMO_VENCER', 'VENCIDO', 'AGOTADO'];
         if (!estadosValidos.includes(estado.toUpperCase())) {
@@ -211,9 +206,8 @@ const obtenerEstadisticasInventario = async (req, res) => {
             return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
         }
 
-        // Obtener configuración de la tienda para diasAlertaVencimiento
-        const config = await Configuracion.findOne({ Tienda: tienda._id });
-        const diasAlerta = config?.diasAlertaVencimiento || 7;
+        // Obtener configuración integrada de la tienda para diasAlertaVencimiento
+        const diasAlerta = tienda.diasAlertaVencimiento ?? 7;
 
         const lotes = await LoteProducto.find()
             .populate({

@@ -2,7 +2,6 @@ const Usuario = require("../models/user.model");
 const Store = require("../models/store.model");
 const MetodoPago = require("../models/payment.model");
 const Categoria = require("../models/category.model");
-const Configuracion = require("../models/config.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
@@ -12,15 +11,25 @@ const sendBrevoEmail  = require('../config/mailer');
 
 
 const validarPassword = (password) => {
-    if (password.length < 8) return "Mínimo 8 caracteres";
-    if (!/[A-Za-z]/.test(password)) return "Debe contener una letra";
-    if (!/\d/.test(password)) return "Debe contener un número";
+    if (typeof password !== "string") {
+        return "La contraseña no es válida";
+    }
+
+    const pwd = password.trim();
+
+    if (pwd.length < 8) return "Mínimo 8 caracteres";
+    if (!/\p{L}/u.test(pwd)) return "Debe contener al menos una letra";
+    if (!/\d/.test(pwd)) return "Debe contener al menos un número";
+
     return null;
 };
 
 const registrarUsuario = async (req, res) => {
+    const session = await Usuario.startSession();
+    session.startTransaction();
+
     try {
-        const { Nombres, Apellidos, Correo, Celular, Contrasena, RUC, RazonSocial} = req.body;
+        const { Nombres, Apellidos, Correo, Celular, Contrasena, RUC, NombreTienda} = req.body;
 
         const requiredFields = {
         Nombres,
@@ -29,13 +38,15 @@ const registrarUsuario = async (req, res) => {
         Contrasena,
         RUC,
         Celular,
-        RazonSocial
+        NombreTienda
         };
 
         const camposFaltantes = Object.keys(requiredFields)
         .filter(field => !requiredFields[field]);
 
         if (camposFaltantes.length > 0) {
+            await session.abortTransaction();
+            session.endSession();
         return res.status(400).json({
             success: false,
             message: "Campos obligatorios incompletos",
@@ -47,24 +58,42 @@ const registrarUsuario = async (req, res) => {
         const correoRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
         if (!nombreRegex.test(Nombres) || !nombreRegex.test(Apellidos)) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({
                 success: false, message: "El campo para nombres y/o apellidos solo deben contener letras y espacios",
             });
         }
         if (!correoRegex.test(Correo)) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ success: false, message: "El correo no es válido" });
+        }
+        if (!/^\d{11}$/.test(RUC)) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ success: false, message: "El RUC debe tener 11 dígitos numéricos" });
+        }
+        if (!/^\d{9}$/.test(Celular)) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ success: false, message: "El celular debe tener entre 9 dígitos numéricos" });
         }
 
         const errorPassword = validarPassword(Contrasena);
         if (errorPassword) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ success: false, message: errorPassword });
         }
 
         const usuarioExistente = await Usuario.findOne({
             $or: [{ Correo }, { Celular }],
-        });
+        }).session(session);
 
         if (usuarioExistente) {
+            await session.abortTransaction();
+            session.endSession();
             const errors = [];
 
             if (usuarioExistente.Correo === Correo) {
@@ -82,12 +111,36 @@ const registrarUsuario = async (req, res) => {
             });
         }
 
-        const storeExistente = await Store.findOne({ RUC });
+        const storeExistente = await Store.findOne({ RUC }).session(session);
         if (storeExistente) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(409).json({ success: false, message: "Ya existe una tienda con ese RUC" });
         }
 
-        
+        // Consultar API externa para obtener RazonSocial del RUC
+        let RazonSocial = null;
+        try {
+            const response = await fetch(`https://consultaruc.win/api/ruc/${RUC}`);
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                if (data && data.result && data.result.razon_social) {
+                    RazonSocial = data.result.razon_social;
+                }
+            }
+        } catch (error) {
+            console.error("Error al consultar RUC en API externa:", error.message);
+        }
+
+        if (!RazonSocial) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ 
+                success: false, 
+                message: "No se pudo obtener la razón social del RUC. Verifique que el RUC sea válido" 
+            });
+        }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(Contrasena, salt);
@@ -100,21 +153,18 @@ const registrarUsuario = async (req, res) => {
             Contrasena: hashedPassword,
             fcmTokens: []         
         });
-        await nuevoUsuario.save();
+        await nuevoUsuario.save({ session });
 
         const nuevoStore = new Store({
             Usuario: nuevoUsuario._id,
             RUC,
+            NombreTienda,
             RazonSocial,
+            stockminimo: 50,
+            diasAlertaVencimiento: 7,
+            monedaDefecto: 'PEN'
         });
-        await nuevoStore.save();
-
-        const nuevaConfig = new Configuracion({
-            stockminimo: "50",
-            diasAlertaVencimiento: "7",            
-            Tienda: nuevoStore._id,
-        });
-        await nuevaConfig.save();
+        await nuevoStore.save({ session });
 
         const metodos = [
             { nombre: "Efectivo", estado: true },
@@ -131,7 +181,7 @@ const registrarUsuario = async (req, res) => {
                     estado: metodo.estado,
                     Tienda: nuevoStore._id,
                 });
-                await nuevoMetodo.save();                
+                await nuevoMetodo.save({ session });                
             } catch (error) {                
                 console.error(`Error creando método: ${metodo.nombre}`, error.message);
                 erroresMetodos.push(metodo.nombre);
@@ -159,7 +209,7 @@ const registrarUsuario = async (req, res) => {
                     descripcion: categoria.descripcion,
                     Tienda: nuevoStore._id,
                 });
-                await nuevaCategoria.save();                
+                await nuevaCategoria.save({ session });                
             } catch (error) {
                 console.error(`Error creando categoría: ${categoria.nombre}`, error.message);
                 erroresCategorias.push(categoria.nombre);
@@ -170,6 +220,10 @@ const registrarUsuario = async (req, res) => {
             erroresCategorias.length === 0
                 ? "Todas las categorías fueron creadas correctamente"
                 : `No se pudieron crear: ${erroresCategorias.join(", ")}`;
+
+        // Confirmar la transacción
+        await session.commitTransaction();
+        session.endSession();
 
         return res.status(201).json({
             success: true,
@@ -183,10 +237,14 @@ const registrarUsuario = async (req, res) => {
             },
             tienda: {
                 RUC: nuevoStore.RUC,
+                NombreTienda: nuevoStore.NombreTienda,
                 RazonSocial: nuevoStore.RazonSocial,
             },
         });
-    } catch (error) {             
+    } catch (error) {
+        // Hacer rollback de la transacción en caso de error
+        await session.abortTransaction();
+        session.endSession();
         return handleError(res, error, {
             message: "Error al registrar usuario",
         });
@@ -378,7 +436,6 @@ const restablecerContraseña = async (req, res) => {
             return res.status(400).json({ success: false, message: errorPassword });
         }
 
-        
         const hashCodigo = crypto
         .createHash("sha256")
         .update(Codigo)
@@ -424,6 +481,41 @@ const cerrarSesion = async (req, res) => {
     }
 };
 
+const verificarRucDisponible = async (req, res) => {
+    const { ruc } = req.query;
+    if (!ruc || !/^\d{11}$/.test(ruc)) {
+        return res.status(400).json({ message: 'RUC debe tener 11 dígitos numéricos' });
+    }
+    try {
+        
+        const storeExistente = await Store.findOne({ RUC: ruc });
+        if (storeExistente) {
+            return res.status(409).json({ success: false, message: 'Ya existe una cuenta registrada con este RUC' });
+        }
+
+        const response = await fetch(`https://consultaruc.win/api/ruc/${ruc}`);
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return res.status(502).json({ success: false, message: 'Error al consultar el RUC. Respuesta inválida del proveedor.' });
+        }
+        const data = await response.json();
+        if (data && data.result && data.result.estado) {
+            return res.status(200).json({
+                success: true,
+                message: 'RUC disponible para registro',
+                estado: data.result.estado,
+                RazonSocial: data.result.razon_social
+            });
+        } else {
+            return res.status(404).json({ success: false, message: 'RUC no encontrado o inválido' });
+        }
+    } catch (error) {
+        return handleError(res, error, {
+            statusCode: 502,
+            message: "Error al consultar el proveedor externo RUC",
+        });
+    }
+};
 
 const verificarRuc = async (req, res) => {
     const { ruc } = req.query;
@@ -497,4 +589,5 @@ module.exports = {
     cerrarSesion,
     verificarRuc,
     verificarDNI,
+    verificarRucDisponible,
 };

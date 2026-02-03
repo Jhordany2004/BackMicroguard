@@ -34,7 +34,7 @@ async function procesarTiendasEnLotes(tiendas, tamañoLote = 5) {
                 resultados.fallidas++;
                 resultados.errores.push({
                     tiendaId: tienda._id,
-                    tiendaNombre: tienda.nombre,
+                    tiendaNombre: tienda.NombreTienda,
                     error: error.message
                 });
                 return { success: false, tienda: tienda._id, error: error.message };
@@ -60,7 +60,7 @@ const iniciarCronNotificaciones = () => {
         console.log(`\n🔔 Notificaciones automáticas iniciadas - ${horaInicio.toLocaleString('es-PE', { timeZone: 'America/Lima' })}`);
         
         try {
-            const tiendas = await Store.find({ estado: true }).select('_id nombre Usuario');
+            const tiendas = await Store.find({ estado: true }).select('_id NombreTienda Usuario');
             
             if (tiendas.length === 0) {
                 console.log('No hay tiendas para procesar\n');

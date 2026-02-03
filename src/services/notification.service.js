@@ -1,17 +1,21 @@
 const admin = require('../config/firebase');
 const LoteProducto = require('../models/batch.model');
 const Producto = require('../models/product.model');
-const Configuracion = require('../models/config.model');
 const Usuario = require('../models/user.model');
 const Store = require('../models/store.model');
 
 async function notificarLotesCriticos(tiendaId) {
     try {
-        // 1. Obtener configuración de la tienda
-        const config = await Configuracion.findOne({ Tienda: tiendaId });
-        if (!config) {
+        // 1. Obtener tienda y configuración integrada
+        const tienda = await Store.findById(tiendaId);
+        if (!tienda) {
             return { lotesNotificados: [], tokensEnviados: [] };
         }
+
+        const config = {
+            stockminimo: tienda.stockminimo ?? 50,
+            diasAlertaVencimiento: tienda.diasAlertaVencimiento ?? 7
+        };
 
         // 2. Buscar productos de la tienda
         const productos = await Producto.find({ Tienda: tiendaId }, '_id');
@@ -61,11 +65,6 @@ async function notificarLotesCriticos(tiendaId) {
         }
 
         // 4. Obtener el usuario dueño de la tienda y sus tokens FCM
-        const tienda = await Store.findById(tiendaId);
-        if (!tienda) {
-            return { lotesNotificados: lotesNotificar, tokensEnviados: [] };
-        }
-
         const usuario = await Usuario.findById(tienda.Usuario);
         const tokens = usuario?.fcmTokens?.filter(Boolean) || [];
 

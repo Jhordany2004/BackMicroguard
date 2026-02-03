@@ -3,6 +3,7 @@ const {
     registrarUsuario,
     verificarRuc,
     verificarDNI,
+    verificarRucDisponible,
     loginUsuario,
     recuperarContraseña,
     restablecerContraseña,    
@@ -16,6 +17,7 @@ const router = express.Router();
 router.post('/crear', registrarUsuario);
 router.get('/verificarRuc', verificarRuc);
 router.get('/verificarDni', verificarDNI);
+router.get('/verificarRucDisponible', verificarRucDisponible);
 router.post('/login', loginUsuario);
 router.post('/cerrarSesion', verificarToken, cerrarSesion);
 router.post('/recuperar', recuperarContraseña);
