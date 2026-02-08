@@ -6,27 +6,14 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const fetch = require('node-fetch');
+const { fetchRuc } = require('../services/ruc.service');
 const { handleError } = require('../helpers/handleError.helpers');
 const sendBrevoEmail  = require('../config/mailer');
 
 
-const validarPassword = (password) => {
-    if (typeof password !== "string") {
-        return "La contraseña no es válida";
-    }
-
-    const pwd = password.trim();
-
-    if (pwd.length < 8) return "Mínimo 8 caracteres";
-    if (!/\p{L}/u.test(pwd)) return "Debe contener al menos una letra";
-    if (!/\d/.test(pwd)) return "Debe contener al menos un número";
-
-    return null;
-};
 
 const registrarUsuario = async (req, res) => {
-    const session = await Usuario.startSession();
-    session.startTransaction();
+    let session = null;
 
     try {
         const { Nombres, Apellidos, Correo, Celular, Contrasena, RUC, NombreTienda} = req.body;
@@ -45,8 +32,7 @@ const registrarUsuario = async (req, res) => {
         .filter(field => !requiredFields[field]);
 
         if (camposFaltantes.length > 0) {
-            await session.abortTransaction();
-            session.endSession();
+            if (session) { await session.abortTransaction(); session.endSession(); }
         return res.status(400).json({
             success: false,
             message: "Campos obligatorios incompletos",
@@ -58,42 +44,25 @@ const registrarUsuario = async (req, res) => {
         const correoRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
         if (!nombreRegex.test(Nombres) || !nombreRegex.test(Apellidos)) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({
-                success: false, message: "El campo para nombres y/o apellidos solo deben contener letras y espacios",
-            });
+            if (session) { await session.abortTransaction(); session.endSession(); }
+            return res.status(400).json({ success: false, message: "El campo para nombres y/o apellidos solo deben contener letras y espacios" });
         }
         if (!correoRegex.test(Correo)) {
-            await session.abortTransaction();
-            session.endSession();
+            if (session) { await session.abortTransaction(); session.endSession(); }
             return res.status(400).json({ success: false, message: "El correo no es válido" });
         }
         if (!/^\d{11}$/.test(RUC)) {
-            await session.abortTransaction();
-            session.endSession();
             return res.status(400).json({ success: false, message: "El RUC debe tener 11 dígitos numéricos" });
         }
         if (!/^\d{9}$/.test(Celular)) {
-            await session.abortTransaction();
-            session.endSession();
             return res.status(400).json({ success: false, message: "El celular debe tener entre 9 dígitos numéricos" });
         }
 
-        const errorPassword = validarPassword(Contrasena);
-        if (errorPassword) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({ success: false, message: errorPassword });
-        }
 
-        const usuarioExistente = await Usuario.findOne({
-            $or: [{ Correo }, { Celular }],
-        }).session(session);
+        const usuarioExistente = await Usuario.findOne({ $or: [{ Correo }, { Celular }] });
 
         if (usuarioExistente) {
-            await session.abortTransaction();
-            session.endSession();
+            if (session) { await session.abortTransaction(); session.endSession(); }
             const errors = [];
 
             if (usuarioExistente.Correo === Correo) {
@@ -111,46 +80,37 @@ const registrarUsuario = async (req, res) => {
             });
         }
 
-        const storeExistente = await Store.findOne({ RUC }).session(session);
+        const storeExistente = await Store.findOne({ RUC });
         if (storeExistente) {
-            await session.abortTransaction();
-            session.endSession();
+            if (session) { await session.abortTransaction(); session.endSession(); }
             return res.status(409).json({ success: false, message: "Ya existe una tienda con ese RUC" });
         }
 
-        // Consultar API externa para obtener RazonSocial del RUC
         let RazonSocial = null;
         try {
-            const response = await fetch(`https://consultaruc.win/api/ruc/${RUC}`);
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                const data = await response.json();
-                if (data && data.result && data.result.razon_social) {
-                    RazonSocial = data.result.razon_social;
-                }
+            const rucResult = await fetchRuc(RUC);
+            if (rucResult && rucResult.razon_social) {
+                RazonSocial = rucResult.razon_social;
             }
-        } catch (error) {
-            console.error("Error al consultar RUC en API externa:", error.message);
+        } catch (err) {
+            const status = err.status || 502;
+            return res.status(status).json({ success: false, message: err.message || 'Error al consultar el RUC' });
         }
 
         if (!RazonSocial) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({ 
-                success: false, 
-                message: "No se pudo obtener la razón social del RUC. Verifique que el RUC sea válido" 
-            });
+            return res.status(400).json({ success: false, message: "No se pudo obtener la razón social del RUC. Verifique que el RUC sea válido" });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(Contrasena, salt);
+        // Iniciar sesión sólo cuando ya vamos a escribir en la DB
+        session = await Usuario.startSession();
+        session.startTransaction();
 
         const nuevoUsuario = new Usuario({
             Nombres,
             Apellidos,
             Correo,
             Celular,
-            Contrasena: hashedPassword,
+            Contrasena: Contrasena,
             fcmTokens: []         
         });
         await nuevoUsuario.save({ session });
@@ -222,8 +182,7 @@ const registrarUsuario = async (req, res) => {
                 : `No se pudieron crear: ${erroresCategorias.join(", ")}`;
 
         // Confirmar la transacción
-        await session.commitTransaction();
-        session.endSession();
+        if (session) { await session.commitTransaction(); session.endSession(); }
 
         return res.status(201).json({
             success: true,
@@ -243,11 +202,8 @@ const registrarUsuario = async (req, res) => {
         });
     } catch (error) {
         // Hacer rollback de la transacción en caso de error
-        await session.abortTransaction();
-        session.endSession();
-        return handleError(res, error, {
-            message: "Error al registrar usuario",
-        });
+        if (session) { await session.abortTransaction(); session.endSession(); }
+        return handleError(res, error, { message: "Error al registrar usuario" });
     }
 };
 
@@ -267,19 +223,9 @@ const loginUsuario = async (req, res) => {
                 .json({ success: false, message: "TokenFCM no proporcionado" });
         }
 
-        const estado = await Usuario.findOne({ estado: true, Correo });
-        if (!estado) {
-            return res
-                .status(403)
-                .json({ success: false, message: "El usuario está inhabilitado, contacte con soporte" });
-        }
-
-        const usuario = await Usuario.findOne({ Correo });
-        if (!usuario) {
-            return res
-                .status(400)
-                .json({ success: false, message: "Correo incorrecto" });
-        }
+        const usuario = await Usuario.findOne({ Correo }).select('+Contrasena');
+        if (!usuario) return res.status(400).json({ success: false, message: "Correo incorrecto" });
+        if (!usuario.estado) return res.status(403).json({ success: false, message: "El usuario está inhabilitado, contacte con soporte" });
 
         const esValida = await bcrypt.compare(Contrasena, usuario.Contrasena);
         if (!esValida) {
@@ -292,7 +238,7 @@ const loginUsuario = async (req, res) => {
         if (fcmToken) {
             await Usuario.findByIdAndUpdate(
                 usuario._id,
-                { $addToSet: { fcmTokens: fcmToken } } 
+                { $addToSet: { fcmTokens: fcmToken } }
             );
         }
 
@@ -306,15 +252,8 @@ const loginUsuario = async (req, res) => {
             RazonSocial: tienda.RazonSocial
         };
 
-        if (!process.env.JWT_SECRET) {
-            throw new Error("JWT_SECRET no definido");
-        }
-
-        const token = jwt.sign(
-        { id: usuario._id },
-        process.env.JWT_SECRET,
-        { expiresIn: "7d" }
-        );
+        if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET no definido");
+        const token = jwt.sign({ id: usuario._id, idTienda: tienda._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 
         res.status(200).json({
@@ -420,54 +359,29 @@ const restablecerContraseña = async (req, res) => {
 
     try {
         const usuario = await Usuario.findOne({ Correo });
-        if (!usuario) {
-        return res.status(404).json({ success: false, message: "Usuario no encontrado" });
-        }
+        if (!usuario) return res.status(404).json({ success: false, message: "Usuario no encontrado" });
 
         if (!/^\d{6}$/.test(Codigo)) {
-        return res.status(400).json({
-            success: false,
-            message: "El código debe tener 6 dígitos",
-        });
+            return res.status(400).json({ success: false, message: "El código debe tener 6 dígitos" });
         }
 
-        const errorPassword = validarPassword(nuevaContrasena);
-        if (errorPassword) {
-            return res.status(400).json({ success: false, message: errorPassword });
+        const hashCodigo = crypto.createHash("sha256").update(Codigo).digest("hex");
+
+        if (usuario.codigoRecuperacion !== hashCodigo || Date.now() > usuario.codigoExpiracion) {
+            return res.status(400).json({ success: false, message: "Código inválido o expirado" });
         }
 
-        const hashCodigo = crypto
-        .createHash("sha256")
-        .update(Codigo)
-        .digest("hex");
-
-        if (
-            usuario.codigoRecuperacion !== hashCodigo ||
-            Date.now() > usuario.codigoExpiracion
-            ) {
-        return res.status(400).json({
-            success: false,
-            message: "Código inválido o expirado",
-        });
-        }
-
-        const hashPassword = await bcrypt.hash(nuevaContrasena, 10);
-
-        usuario.Contrasena = hashPassword;
+        // Asignar la nueva contraseña en plano; el modelo la validará y la hasheará en pre-save
+        usuario.Contrasena = nuevaContrasena;
         usuario.codigoRecuperacion = null;
         usuario.codigoExpiracion = null;
 
         await usuario.save();
 
-        return res.status(200).json({
-        success: true,
-        message: "Contraseña actualizada correctamente",
-        });
+        return res.status(200).json({ success: true, message: "Contraseña actualizada correctamente" });
 
-    } catch (error) {       
-        return handleError(res, error, {
-            message: "Error al restablecer la contraseña",
-        });
+    } catch (error) {
+        return handleError(res, error, { message: "Error al restablecer la contraseña" });
     }
 };
 
