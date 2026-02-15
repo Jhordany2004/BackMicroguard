@@ -7,101 +7,118 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const fetch = require('node-fetch');
 const { fetchRuc } = require('../services/ruc.service');
-const { handleError } = require('../helpers/handleError.helpers');
+const { handleError } = require('../utils/handleError');
+const { success } = require("../utils/handleResponse");
 const sendBrevoEmail  = require('../config/mailer');
-
-
 
 const registrarUsuario = async (req, res) => {
     let session = null;
 
     try {
-        const { Nombres, Apellidos, Correo, Celular, Contrasena, RUC, NombreTienda} = req.body;
+        const {
+            Nombres,
+            Apellidos,
+            Correo,
+            Celular,
+            Contrasena,
+            RUC,
+            NombreTienda
+        } = req.body;
 
         const requiredFields = {
-        Nombres,
-        Apellidos,
-        Correo,
-        Contrasena,
-        RUC,
-        Celular,
-        NombreTienda
+            Nombres,
+            Apellidos,
+            Correo,
+            Contrasena,
+            RUC,
+            Celular,
+            NombreTienda
         };
 
         const camposFaltantes = Object.keys(requiredFields)
-        .filter(field => !requiredFields[field]);
+            .filter(field => !requiredFields[field]);
 
         if (camposFaltantes.length > 0) {
-            if (session) { await session.abortTransaction(); session.endSession(); }
-        return res.status(400).json({
-            success: false,
-            message: "Campos obligatorios incompletos",
-            errors: camposFaltantes
-        });
+            return res.status(400).json({
+                success: false,
+                message: "Campos obligatorios incompletos",
+                errors: camposFaltantes
+            });
         }
 
         const nombreRegex = /^[A-Za-zÑñÁÉÍÓÚáéíóú\s]+$/;
         const correoRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
         if (!nombreRegex.test(Nombres) || !nombreRegex.test(Apellidos)) {
-            if (session) { await session.abortTransaction(); session.endSession(); }
-            return res.status(400).json({ success: false, message: "El campo para nombres y/o apellidos solo deben contener letras y espacios" });
+            return res.status(400).json({
+                success: false,
+                message: "Nombres y apellidos solo deben contener letras y espacios"
+            });
         }
+
         if (!correoRegex.test(Correo)) {
-            if (session) { await session.abortTransaction(); session.endSession(); }
-            return res.status(400).json({ success: false, message: "El correo no es válido" });
+            return res.status(400).json({
+                success: false,
+                message: "El correo no es válido"
+            });
         }
+
         if (!/^\d{11}$/.test(RUC)) {
-            return res.status(400).json({ success: false, message: "El RUC debe tener 11 dígitos numéricos" });
+            return res.status(400).json({
+                success: false,
+                message: "El RUC debe tener 11 dígitos numéricos"
+            });
         }
+
         if (!/^\d{9}$/.test(Celular)) {
-            return res.status(400).json({ success: false, message: "El celular debe tener entre 9 dígitos numéricos" });
+            return res.status(400).json({
+                success: false,
+                message: "El celular debe tener 9 dígitos numéricos"
+            });
         }
 
-
-        const usuarioExistente = await Usuario.findOne({ $or: [{ Correo }, { Celular }] });
+        const usuarioExistente = await Usuario.findOne({
+            $or: [{ Correo }, { Celular }]
+        });
 
         if (usuarioExistente) {
-            if (session) { await session.abortTransaction(); session.endSession(); }
             const errors = [];
-
-            if (usuarioExistente.Correo === Correo) {
-                errors.push("Correo");
-            }
-
-            if (usuarioExistente.Celular === Celular) {
-                errors.push("Celular");
-            }
+            if (usuarioExistente.Correo === Correo) errors.push("Correo");
+            if (usuarioExistente.Celular === Celular) errors.push("Celular");
 
             return res.status(409).json({
                 success: false,
-                message: "Estos datos ya estan en uso",
+                message: "Estos datos ya están en uso",
                 errors
             });
         }
 
         const storeExistente = await Store.findOne({ RUC });
         if (storeExistente) {
-            if (session) { await session.abortTransaction(); session.endSession(); }
-            return res.status(409).json({ success: false, message: "Ya existe una tienda con ese RUC" });
+            return res.status(409).json({
+                success: false,
+                message: "Ya existe una tienda con ese RUC"
+            });
         }
 
         let RazonSocial = null;
         try {
             const rucResult = await fetchRuc(RUC);
-            if (rucResult && rucResult.razon_social) {
-                RazonSocial = rucResult.razon_social;
-            }
+            RazonSocial = rucResult?.razon_social;
         } catch (err) {
-            const status = err.status || 502;
-            return res.status(status).json({ success: false, message: err.message || 'Error al consultar el RUC' });
+            return handleError(res, err, {
+                statusCode: err.status || 502,
+                message: "Error al consultar el RUC"
+            });
         }
 
         if (!RazonSocial) {
-            return res.status(400).json({ success: false, message: "No se pudo obtener la razón social del RUC. Verifique que el RUC sea válido" });
+            return res.status(400).json({
+                success: false,
+                message: "No se pudo obtener la razón social del RUC"
+            });
         }
 
-        // Iniciar sesión sólo cuando ya vamos a escribir en la DB
         session = await Usuario.startSession();
         session.startTransaction();
 
@@ -110,8 +127,8 @@ const registrarUsuario = async (req, res) => {
             Apellidos,
             Correo,
             Celular,
-            Contrasena: Contrasena,
-            fcmTokens: []         
+            Contrasena,
+            fcmTokens: []
         });
         await nuevoUsuario.save({ session });
 
@@ -122,7 +139,7 @@ const registrarUsuario = async (req, res) => {
             RazonSocial,
             stockminimo: 50,
             diasAlertaVencimiento: 7,
-            monedaDefecto: 'PEN'
+            monedaDefecto: "PEN"
         });
         await nuevoStore.save({ session });
 
@@ -133,77 +150,73 @@ const registrarUsuario = async (req, res) => {
             { nombre: "Transferencia", estado: false }
         ];
 
-        const erroresMetodos = [];        
+        const erroresMetodos = [];
         for (const metodo of metodos) {
             try {
-                const nuevoMetodo = new MetodoPago({
+                await new MetodoPago({
                     nombre: metodo.nombre,
                     estado: metodo.estado,
-                    Tienda: nuevoStore._id,
-                });
-                await nuevoMetodo.save({ session });                
-            } catch (error) {                
-                console.error(`Error creando método: ${metodo.nombre}`, error.message);
+                    Tienda: nuevoStore._id
+                }).save({ session });
+            } catch {
                 erroresMetodos.push(metodo.nombre);
             }
         }
 
-        const mensajeMetodos =
-        erroresMetodos.length === 0
-            ? "Todos los métodos de pago fueron creados correctamente"
-            : `No se pudieron crear: ${erroresMetodos.join(", ")}`;
-
         const categorias = [
-            { nombre: "Abarrotes", descripcion: "Productos de primera necesidad y alimentos básicos" },
-            { nombre: "Bebidas", descripcion: "Todo tipo de bebidas, gaseosas, jugos y agua" },
-            { nombre: "Limpieza", descripcion: "Productos para limpieza y aseo" },
-            { nombre: "Snacks", descripcion: "Productos para picar y snacks" },
-            { nombre: "Otros", descripcion: "Categoría para productos varios" }
+            { nombre: "Abarrotes", descripcion: "Productos de primera necesidad" },
+            { nombre: "Bebidas", descripcion: "Todo tipo de bebidas" },
+            { nombre: "Limpieza", descripcion: "Productos de limpieza" },
+            { nombre: "Snacks", descripcion: "Productos para picar" },
+            { nombre: "Otros", descripcion: "Productos varios" }
         ];
 
         const erroresCategorias = [];
         for (const categoria of categorias) {
             try {
-                const nuevaCategoria = new Categoria({
-                    nombre: categoria.nombre,
-                    descripcion: categoria.descripcion,
-                    Tienda: nuevoStore._id,
-                });
-                await nuevaCategoria.save({ session });                
-            } catch (error) {
-                console.error(`Error creando categoría: ${categoria.nombre}`, error.message);
+                await new Categoria({
+                    ...categoria,
+                    Tienda: nuevoStore._id
+                }).save({ session });
+            } catch {
                 erroresCategorias.push(categoria.nombre);
             }
         }
 
-        const mensajeCategorias =
-            erroresCategorias.length === 0
-                ? "Todas las categorías fueron creadas correctamente"
-                : `No se pudieron crear: ${erroresCategorias.join(", ")}`;
-
-        // Confirmar la transacción
-        if (session) { await session.commitTransaction(); session.endSession(); }
+        await session.commitTransaction();
+        session.endSession();
 
         return res.status(201).json({
             success: true,
             message: "Usuario y tienda registrados correctamente",
-            metodosPago: mensajeMetodos,
-            categorias: mensajeCategorias,
+            metodosPago:
+                erroresMetodos.length === 0
+                    ? "Todos los métodos creados"
+                    : `No se pudieron crear: ${erroresMetodos.join(", ")}`,
+            categorias:
+                erroresCategorias.length === 0
+                    ? "Todas las categorías creadas"
+                    : `No se pudieron crear: ${erroresCategorias.join(", ")}`,
             usuario: {
                 Nombres: nuevoUsuario.Nombres,
                 Apellidos: nuevoUsuario.Apellidos,
-                Correo: nuevoUsuario.Correo,
+                Correo: nuevoUsuario.Correo
             },
             tienda: {
                 RUC: nuevoStore.RUC,
                 NombreTienda: nuevoStore.NombreTienda,
-                RazonSocial: nuevoStore.RazonSocial,
-            },
+                RazonSocial: nuevoStore.RazonSocial
+            }
         });
+
     } catch (error) {
-        // Hacer rollback de la transacción en caso de error
-        if (session) { await session.abortTransaction(); session.endSession(); }
-        return handleError(res, error, { message: "Error al registrar usuario" });
+        if (session) {
+            await session.abortTransaction();
+            session.endSession();
+        }
+        return handleError(res, error, {
+            message: "Error al registrar usuario"
+        });
     }
 };
 
@@ -212,59 +225,91 @@ const loginUsuario = async (req, res) => {
         const { Correo, Contrasena, fcmToken } = req.body;
 
         if (!Correo || !Contrasena) {
-            return res
-                .status(400)
-                .json({ success: false, message: "Correo y contraseña son obligatorios" });
-        }
-        
-        if (!fcmToken) {
-            return res
-                .status(400)
-                .json({ success: false, message: "TokenFCM no proporcionado" });
+            return res.status(400).json({
+                success: false,
+                message: "Correo y contraseña son obligatorios",
+                errors: [
+                    !Correo ? "Correo" : null,
+                    !Contrasena ? "Contrasena" : null
+                ].filter(Boolean)
+            });
         }
 
-        const usuario = await Usuario.findOne({ Correo }).select('+Contrasena');
-        if (!usuario) return res.status(400).json({ success: false, message: "Correo incorrecto" });
-        if (!usuario.estado) return res.status(403).json({ success: false, message: "El usuario está inhabilitado, contacte con soporte" });
+        if (!fcmToken) {
+            return res.status(400).json({
+                success: false,
+                message: "Token FCM no proporcionado"
+            });
+        }
+
+
+        const usuario = await Usuario
+            .findOne({ Correo })
+            .select("+Contrasena");
+
+        if (!usuario) {
+            return res.status(404).json({
+                success: false,
+                message: "Usuario no encontrado"
+            });
+        }
+
+        if (!usuario.estado) {
+            return res.status(403).json({
+                success: false,
+                message: "El usuario está inhabilitado, contacte con soporte"
+            });
+        }
 
         const esValida = await bcrypt.compare(Contrasena, usuario.Contrasena);
         if (!esValida) {
-            return res
-                .status(401)
-                .json({ success: false, message: "Contraseña incorrecta" });
+            return res.status(401).json({
+                success: false,
+                message: "Contraseña incorrecta"
+            });
         }
 
-        // Guardar el token FCM si se envía y no está repetido/registrado
-        if (fcmToken) {
-            await Usuario.findByIdAndUpdate(
-                usuario._id,
-                { $addToSet: { fcmTokens: fcmToken } }
-            );
-        }
+        await Usuario.findByIdAndUpdate(
+            usuario._id,
+            { $addToSet: { fcmTokens: fcmToken } }
+        );
 
         const tienda = await Store.findOne({ Usuario: usuario._id });
+        if (!tienda) {
+            return res.status(404).json({
+                success: false,
+                message: "No se encontró una tienda asociada a este usuario"
+            });
+        }
 
-        const usuarios = {
-            _id: usuario._id,
-            Nombres: usuario.Nombres,
-            Apellidos: usuario.Apellidos,
-            RUC: tienda.RUC,
-            RazonSocial: tienda.RazonSocial
-        };
+        if (!process.env.JWT_SECRET) {
+            throw new Error("JWT_SECRET no definido");
+        }
 
-        if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET no definido");
-        const token = jwt.sign({ id: usuario._id, idTienda: tienda._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign(
+            { id: usuario._id, idTienda: tienda._id },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+        );
 
-
-        res.status(200).json({
-            success: true,
-            message: "Se ha iniciado sesión exitosamente",
-            token,
-            data: usuarios,
+        return success(res, {
+            message: "Inicio de sesión exitoso",
+            data: {
+                token,
+                usuario: {
+                    _id: usuario._id,
+                    Nombres: usuario.Nombres,
+                    Apellidos: usuario.Apellidos,
+                    Correo: usuario.Correo,
+                    RUC: tienda.RUC,
+                    RazonSocial: tienda.RazonSocial
+                }
+            }
         });
+
     } catch (error) {
         return handleError(res, error, {
-            message: "Error al iniciar sesión",
+            message: "Error al iniciar sesión"
         });
     }
 };
@@ -371,7 +416,7 @@ const restablecerContraseña = async (req, res) => {
             return res.status(400).json({ success: false, message: "Código inválido o expirado" });
         }
 
-        // Asignar la nueva contraseña en plano; el modelo la validará y la hasheará en pre-save
+        
         usuario.Contrasena = nuevaContrasena;
         usuario.codigoRecuperacion = null;
         usuario.codigoExpiracion = null;
