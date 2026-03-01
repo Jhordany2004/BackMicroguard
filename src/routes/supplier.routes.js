@@ -5,8 +5,7 @@ const {
     listarProveedores,
     obtenerProveedores,
     obtenerProveedorPorID,
-    deshabilitarProveedor,
-    habilitarProveedor,
+    cambiarEstadoProveedor,
     obtenerPorDocumentoYRazonSocial,
 } = require('../controllers/supplier.controller');
 
@@ -14,14 +13,14 @@ const { verificarToken } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
+router.use(verificarToken);
 
-router.post('/', verificarToken, registrarProveedor);
-router.get('/', verificarToken, listarProveedores);
-router.get('/activos', verificarToken, obtenerProveedores);
-router.get('/buscar', verificarToken, obtenerPorDocumentoYRazonSocial);
-router.get('/:id', verificarToken, obtenerProveedorPorID);
-router.put('/:id', verificarToken, editarProveedor);
-router.patch('/:id/disable', verificarToken, deshabilitarProveedor);
-router.patch('/:id/enable', verificarToken, habilitarProveedor);
+router.post('/', registrarProveedor);
+router.get('/', listarProveedores);
+router.get('/activos', obtenerProveedores);
+router.get('/buscar', obtenerPorDocumentoYRazonSocial);
+router.get('/:id', obtenerProveedorPorID);
+router.put('/:id', editarProveedor);
+router.patch('/:id/estado', cambiarEstadoProveedor);
 
 module.exports = router;

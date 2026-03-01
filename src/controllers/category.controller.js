@@ -8,12 +8,9 @@ const registrarCategoria = async (req, res) => {
     try {
         const { nombre, descripcion} = req.body;
 
-        const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
+        const tienda = await Tienda.findById(req.idTienda);
         if (!tienda) {
-        console.log("Tienda no encontrada para el usuario:", req.usuarioId);
-        return res
-            .status(404)
-            .json({ message: "Tienda no encontrada para el usuario" });
+            return res.status(404).json({ message: "Tienda no encontrada" });
         }
 
         if (!nombre) {
@@ -38,14 +35,12 @@ const registrarCategoria = async (req, res) => {
         });
         await categoria.save();
 
-        res.status(201).json({
+        return success(res, {
         message: "Categoria registrado exitosamente",
-        nombre,
+        data: categoria
         });
     } catch (error) {
-        const errorMessage = error.message || "Error al registrar el Categoria";
-        console.log("Error Back-End:", errorMessage);
-        res.status(500).json({ message: errorMessage });
+        return handleError(res, error, { message: "Error al registrar el categoria" });
     }
 };
 
@@ -70,9 +65,9 @@ const listarCategoria = async (req, res) => {
         }));
         return success(res, {message: "Categorias activas obtenidas correctamente", data: categorias});
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al obtener categorias" });
+        return handleError(res, error, { message: "Error al obtener categorias" });
     }
-};
+};  
 
 //Listar solo las categorias activas de la tienda (Por ejemplo para tabla de venta o compras)
 const obtenerCategoria = async (req, res) => {
