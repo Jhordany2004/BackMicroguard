@@ -2,6 +2,7 @@ const express = require('express');
 const {
     registrarCategoria,
     obtenerCategoria,
+    obtenerCategoriasInactivas,
     listarCategoria,
     editarCategoria,
     deshabilitarCategoria,
@@ -13,13 +14,15 @@ const { verificarToken } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
+router.use(verificarToken);
 
-router.post('/', verificarToken, registrarCategoria);
-router.get('/', verificarToken, listarCategoria);
-router.get('/activos', verificarToken, obtenerCategoria);
-router.get('/:id', verificarToken, buscarCategoria);
-router.put('/:id', verificarToken, editarCategoria);
-router.patch('/:id/disable' , verificarToken, deshabilitarCategoria);
-router.patch('/:id/enable', verificarToken, habilitarCategoria);
+router.post('/', registrarCategoria);
+router.get('/',  listarCategoria);
+router.get('/inactivos',  obtenerCategoriasInactivas);
+router.get('/activos',  obtenerCategoria);
+router.get('/:id',  buscarCategoria);
+router.put('/:id',  editarCategoria);
+router.patch('/:id/disable' ,  deshabilitarCategoria);
+router.patch('/:id/enable',  habilitarCategoria);
 
 module.exports = router;

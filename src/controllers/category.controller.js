@@ -93,6 +93,29 @@ const obtenerCategoria = async (req, res) => {
     }
 };
 
+const obtenerCategoriasInactivas = async (req, res) => {
+    try {
+        const tienda = await Tienda.findById(req.idTienda);
+        if (!tienda) {
+            return res.status(404).json({ message: "Tienda no encontrada" });
+        }
+        const categoriaActivo = await Categoria.find({ Tienda: tienda._id, estado: false });
+        if (!categoriaActivo.length) {
+            return res.status(404).json({ message: "No hay categorias inactivas o registre uno" });
+        }
+        const categorias = categoriaActivo.map(categoria => ({
+            _id: categoria._id,
+            nombre: categoria.nombre,
+            descripcion: categoria.descripcion,
+            fechaCreacion: formatDatePeru(categoria.createdAt),
+            estado: categoria.estado
+        }));
+        return success(res, {message: "Categorias inactivas obtenidas correctamente", data: categorias});
+    } catch (error) {
+        return handleError(res, error, { message: "Error al obtener categorias" });
+    }
+};
+
 //Buscar una categoría específica por ID, con estado activo.
 const buscarCategoria = async (req, res) => {
     try {
@@ -257,5 +280,6 @@ module.exports = {
     listarCategoria,
     editarCategoria,
     deshabilitarCategoria,
+    obtenerCategoriasInactivas,
     habilitarCategoria
 };
