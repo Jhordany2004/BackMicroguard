@@ -9,8 +9,10 @@ const { verificarToken } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
-router.post('/', verificarToken, registrarMetodoPago);
-router.get('/', verificarToken, listarMetodoPago);
-router.get('/activos', verificarToken, obtenerMetodoPago);
+router.use(verificarToken);
+
+router.post('/', registrarMetodoPago);
+router.get('/', listarMetodoPago);
+router.get('/activos', obtenerMetodoPago);
 
 module.exports = router;

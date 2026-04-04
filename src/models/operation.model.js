@@ -13,6 +13,7 @@ const modeloOperacion = new Schema({
             productoId: { type: Schema.Types.ObjectId, ref: 'Producto' },
             nombre: { type: String },
             medida: { type: String },
+            codigoInterno: { type: String },
             codigoBarras: { type: String }
         }
     },

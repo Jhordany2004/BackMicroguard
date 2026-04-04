@@ -4,14 +4,17 @@ const { handleError } = require('../utils/handleError');
 const { success } = require('../utils/handleResponse');
 const { formatDatePeru } = require("../utils/formatDate");
 
+const obtenerTienda = async (idTienda) => {
+    const tienda = await Tienda.findById(idTienda);
+    if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
+    return tienda;
+};
+
 const registrarCategoria = async (req, res) => {
     try {
         const { nombre, descripcion} = req.body;
 
-        const tienda = await Tienda.findById(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada" });
-        }
+        const tienda = await obtenerTienda(req.idTienda);        
 
         if (!nombre) {
         return res
@@ -48,10 +51,8 @@ const registrarCategoria = async (req, res) => {
 //Listar todas las categorias de la tienda, sin importar su estado (activa o inactiva)
 const listarCategoria = async (req, res) => {
     try {
-        const tienda = await Tienda.findById(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada" });
-        }
+        const tienda = await obtenerTienda(req.idTienda);
+        
         const categoriaActivo = await Categoria.find({ Tienda: tienda._id});
         if (!categoriaActivo.length) {
             return res.status(404).json({ message: "No hay categorias activas" });
@@ -72,10 +73,8 @@ const listarCategoria = async (req, res) => {
 //Listar solo las categorias activas de la tienda (Por ejemplo para tabla de venta o compras)
 const obtenerCategoria = async (req, res) => {
     try {
-        const tienda = await Tienda.findById(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada" });
-        }
+        const tienda = await obtenerTienda(req.idTienda);
+
         const categoriaActivo = await Categoria.find({ Tienda: tienda._id, estado: true });
         if (!categoriaActivo.length) {
             return res.status(404).json({ message: "No hay categorias activas o registre uno" });
@@ -95,10 +94,8 @@ const obtenerCategoria = async (req, res) => {
 
 const obtenerCategoriasInactivas = async (req, res) => {
     try {
-        const tienda = await Tienda.findById(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada" });
-        }
+        const tienda = await obtenerTienda(req.idTienda);
+        
         const categoriaActivo = await Categoria.find({ Tienda: tienda._id, estado: false });
         if (!categoriaActivo.length) {
             return res.status(404).json({ message: "No hay categorias inactivas o registre uno" });
@@ -126,10 +123,7 @@ const buscarCategoria = async (req, res) => {
             return res.status(400).json({ message: "El ID de la categoría es requerido" });
         }
 
-        const tienda = await Tienda.findById(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada" });
-        }
+        const tienda = await obtenerTienda(req.idTienda);
 
         // Buscar la categoría específica por ID y que pertenezca a la tienda
         const categoria = await Categoria.findOne({ estado: true, _id: id, Tienda: tienda._id });
@@ -157,10 +151,7 @@ const editarCategoria = async (req, res) => {
         const { nombre, descripcion } = req.body;
 
         // Validar que exista la tienda
-        const tienda = await Tienda.findById(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada" });
-        }
+        const tienda = await obtenerTienda(req.idTienda);
 
         // Buscar la categoría por ID y tienda
         const categoriaExistente = await Categoria.findOne({

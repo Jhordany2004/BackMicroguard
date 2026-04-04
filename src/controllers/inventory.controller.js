@@ -224,11 +224,12 @@ const obtenerEstadisticasInventario = async (req, res) => {
         let totalStock = 0;
 
         lotesDelTienda.forEach(lote => {
-            totalValorInventario += (lote.stockActual * lote.precioVenta);
+            const precioVenta = lote.Producto?.precioVenta || 0;
+            totalValorInventario += (lote.stockActual * precioVenta);
             totalStock += lote.stockActual;
         });
 
-        totalProductos = await Producto.countDocuments({ Tienda: tienda._id });
+        totalProductos = await Producto.countDocuments({ Tienda: tienda._id, estado: true });
 
         const resumen = obtenerResumenEstados(lotesDelTienda);
 

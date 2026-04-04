@@ -20,6 +20,7 @@ const purchaseRoutes = require("./src/routes/purchase.routes");
 const ventaRoutes = require("./src/routes/sales.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
 const inventarioRoutes = require("./src/routes/inventory.routes");
+const productRoutes = require("./src/routes/product.routes");
 
 app.use("/usuario", usuarioRoutes);
 app.use("/proveedor", proveedorRoutes);
@@ -30,6 +31,7 @@ app.use("/compra", purchaseRoutes);
 app.use("/venta", ventaRoutes);
 app.use("/notificacion", notificationRoutes);
 app.use("/inventario", inventarioRoutes);
+app.use("/producto", productRoutes);
 
 async function startServer() {
     try {

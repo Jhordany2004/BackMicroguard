@@ -11,11 +11,13 @@ const { verificarToken } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
+router.use(verificarToken);
 
-router.get('/', verificarToken, obtenerInventarioCompleto);
-router.get('/alertas', verificarToken, obtenerAlertasInventario);
-router.get('/estadisticas', verificarToken, obtenerEstadisticasInventario);
-router.get('/estado/:estado', verificarToken, obtenerLotesPorEstado);
-router.get('/producto/:id', verificarToken, obtenerLotesProducto);
+
+router.get('/', obtenerInventarioCompleto);
+router.get('/alertas', obtenerAlertasInventario);
+router.get('/estadisticas', obtenerEstadisticasInventario);
+router.get('/estado/:estado', obtenerLotesPorEstado);
+router.get('/producto/:id', obtenerLotesProducto);
 
 module.exports = router;

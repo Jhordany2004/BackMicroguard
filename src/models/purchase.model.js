@@ -4,7 +4,7 @@ const detalleCompraSchema = new Schema({
     lote: { type: Schema.Types.ObjectId, ref: 'LoteProducto', required: true },
     cantidadComprada: { type: Number, required: true },
     precioUnitario: { type: Number, required: true },
-    precioTotal: { type: Number, required: true }, // cantidadComprada * precioUnitario
+    precioTotal: { type: Number, required: true }, // cantidadComprada * precioUnitario 
     
     // Denormalización mínima para Flutter (sin populate)
     producto: {
