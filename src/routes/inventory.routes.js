@@ -1,10 +1,9 @@
 const express = require('express');
 const {
-    obtenerInventarioCompleto,
-    obtenerAlertasInventario,
-    obtenerLotesProducto,
-    obtenerLotesPorEstado,
-    obtenerEstadisticasInventario
+    obtenerInventarioProductos,
+    obtenerDetalleProducto,
+    obtenerEstadoProducto,
+    obtenerEstadosDisponibles
 } = require('../controllers/inventory.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -13,11 +12,9 @@ const router = express.Router();
 
 router.use(verificarToken);
 
-
-router.get('/', obtenerInventarioCompleto);
-router.get('/alertas', obtenerAlertasInventario);
-router.get('/estadisticas', obtenerEstadisticasInventario);
-router.get('/estado/:estado', obtenerLotesPorEstado);
-router.get('/producto/:id', obtenerLotesProducto);
+router.get('/', obtenerInventarioProductos);
+router.get('/producto/:id', obtenerDetalleProducto);
+router.get('/estados', obtenerEstadosDisponibles);
+router.get('/estados/:id', obtenerEstadoProducto);
 
 module.exports = router;

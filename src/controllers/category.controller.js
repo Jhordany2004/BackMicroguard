@@ -118,14 +118,12 @@ const buscarCategoria = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Validar que el ID sea válido
         if (!id) {
             return res.status(400).json({ message: "El ID de la categoría es requerido" });
         }
 
         const tienda = await obtenerTienda(req.idTienda);
 
-        // Buscar la categoría específica por ID y que pertenezca a la tienda
         const categoria = await Categoria.findOne({ estado: true, _id: id, Tienda: tienda._id });
         if (!categoria) {
             return res.status(404).json({ message: "Categoría no encontrada" });
@@ -150,10 +148,8 @@ const editarCategoria = async (req, res) => {
         const { id } = req.params;
         const { nombre, descripcion } = req.body;
 
-        // Validar que exista la tienda
         const tienda = await obtenerTienda(req.idTienda);
 
-        // Buscar la categoría por ID y tienda
         const categoriaExistente = await Categoria.findOne({
             _id: id,
             Tienda: tienda._id
@@ -166,7 +162,6 @@ const editarCategoria = async (req, res) => {
             });
         }
 
-        // Validar nombre único dentro de la misma tienda
         if (nombre && nombre !== categoriaExistente.nombre) {
             const existeNom = await Categoria.findOne({
                 nombre,
@@ -182,13 +177,11 @@ const editarCategoria = async (req, res) => {
             }
         }
 
-        // Actualizar campos
         categoriaExistente.nombre = nombre ?? categoriaExistente.nombre;
         categoriaExistente.descripcion = descripcion ?? categoriaExistente.descripcion;
 
         await categoriaExistente.save();
 
-        // Formato de respuesta
         const categoriaEditada = {
             _id: categoriaExistente._id,
             nombre: categoriaExistente.nombre,

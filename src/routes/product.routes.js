@@ -7,9 +7,10 @@ const {
 const { verificarToken } = require("../middlewares/auth.middleware");
 
 const router = express.Router();
+router.use(verificarToken);
 
-router.get("/sugerencias", verificarToken, obtenerSugerencias);
-router.get("/buscar", verificarToken, buscarProductos);
-router.get("/codigo/:codigo", verificarToken, obtenerProductoPorCodigo);
+router.get("/sugerencias",  obtenerSugerencias);
+router.get("/buscar", buscarProductos);
+router.get("/codigo/:codigo", obtenerProductoPorCodigo);
 
 module.exports = router;

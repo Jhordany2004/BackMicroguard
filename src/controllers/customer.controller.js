@@ -153,27 +153,25 @@ const editarCliente = async (req, res) => {
         const { id } = req.params;
         const { nombre, apellido, telefono } = req.body;
 
-        // Validar que ID sea válido
         const clienteExistente = await Cliente.findById(id);
         if (!clienteExistente) {
             return res.status(404).json({ message: "Cliente no encontrado" });
         }
 
-         // Validar nombre único si se modifica
         if (nombre && nombre !== clienteExistente.nombre) {
             const existeNom = await Cliente.findOne({ nombre });
             if (existeNom) {
                 return res.status(409).json({ message: "Ya existe un cliente con este nombre" });
             }
         }
-        // Validar apellido único si se modifica
+
         if (apellido && apellido !== clienteExistente.apellido) {
             const existeApel = await Cliente.findOne({ apellido });
             if (existeApel) {
                 return res.status(409).json({ message: "Ya existe un cliente con este apellido" });
             }
         }
-        // Validar telefono único si se modifica
+
         if (telefono && telefono !== clienteExistente.telefono) {
             const existeTel = await Cliente.findOne({ telefono });
             if (existeTel) {

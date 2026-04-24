@@ -21,34 +21,13 @@ const normalizarNumeroOpcional = (valor) => {
 
 const modeloProducto = new Schema({
     nombre: { type: String, required: true, trim: true },
-    codigoBarras: {
-        type: String,
-        required: false,
-        trim: true,
-        sparse: true,
-        set: normalizarTextoOpcional
-    },
-    codigoInterno: {
-        type: String,
-        required: true,
-        trim: true,
-        uppercase: true
-    },
+    codigoBarras: {type: String,required: false,trim: true,sparse: true,set: normalizarTextoOpcional},
+    codigoInterno: {type: String,required: true,trim: true,uppercase: true},
     imagen: { type: String, required: false, trim: true },
-    cantidadmedida: {
-        type: Number,
-        required: false,
-        min: 0.01,
-        set: normalizarNumeroOpcional
-    },
+    cantidadmedida: {type: Number,required: false,min: 0.01,set: normalizarNumeroOpcional},
     precioVenta: { type: Number, required: true, min: 0 },
     stockTotal: { type: Number, required: true, min: 0, default: 0 },
-    medida: {
-        type: String,
-        required: false,
-        lowercase: true,
-        trim: true,
-        set: normalizarTextoOpcional,
+    medida: {type: String,required: false,lowercase: true,trim: true,set: normalizarTextoOpcional,
         enum: {
             values: UNIDADES_MEDIDA,
             message: "La medida debe ser una de las siguientes: lt, ml, g, kg, kl"

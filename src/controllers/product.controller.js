@@ -12,8 +12,10 @@ const normalizarNumero = (valor, fallback) => {
     return Number.isFinite(numero) ? numero : fallback;
 };
 
-const obtenerTiendaUsuario = async (idTienda) => {
-    return Tienda.findById(idTienda);
+const obtenerTienda = async (idTienda) => {
+    const tienda = await Tienda.findById(idTienda);
+    if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
+    return tienda;
 };
 
 const obtenerCategoriaNormalizada = (categoria) => {
@@ -144,13 +146,7 @@ const obtenerSugerencias = async (req, res) => {
             });
         }
 
-        const tienda = await obtenerTiendaUsuario(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ 
-                success: false, 
-                message: "Tienda no encontrada para el usuario" 
-            });
-        }
+        await obtenerTienda(req.idTienda);
 
         const filtro = construirFiltroSugerencias({
             tiendaId: req.idTienda,
@@ -219,11 +215,8 @@ const buscarProductos = async (req, res) => {
         const page = Math.max(1, normalizarNumero(req.query.page, 1));
         const skip = (page - 1) * limit;
 
-        const tienda = await obtenerTiendaUsuario(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ success: false, message: "Tienda no encontrada para el usuario" });
-        }
-
+        await obtenerTienda(req.idTienda);
+        
         const filtro = construirFiltroBusqueda({
             tiendaId: req.idTienda,
             query,
@@ -267,10 +260,7 @@ const obtenerProductoPorCodigo = async (req, res) => {
             });
         }
 
-        const tienda = await obtenerTiendaUsuario(req.idTienda);
-        if (!tienda) {
-            return res.status(404).json({ success: false, message: "Tienda no encontrada para el usuario" });
-        }
+        await obtenerTienda(req.idTienda);       
 
         const producto = await Producto.findOne({
             Tienda: req.idTienda,

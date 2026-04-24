@@ -35,17 +35,15 @@ app.use("/producto", productRoutes);
 
 async function startServer() {
     try {
-        // Conectar a la base de datos
+
         await connectDB();
 
-        // Iniciar cron de notificaciones
         iniciarCronNotificaciones();
 
-        // Iniciar servidor
         const PORT = process.env.PORT || 8080;
-        const HOST = '0.0.0.0'; // ⬅️ Añadir esto para hosting
+        const HOST = '0.0.0.0'; 
         
-        app.listen(PORT, HOST, () => { // ⬆️ Añadir HOST aquí
+        app.listen(PORT, HOST, () => { 
             console.log(`\n====================================`);
             console.log(`   ✅ Servidor corriendo en puerto http://localhost:${PORT}`);
             console.log(`   🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);

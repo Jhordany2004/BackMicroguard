@@ -7,7 +7,7 @@ const Tienda = require("../models/store.model");
 const { handleError } = require("../utils/handleError");
 
 const registrarVenta = async (req, res) => {
-    let session = null;
+    let session = null;         
 
     try {
         const { Cliente: clienteId, MetodoPago: metodoPagoId, detalles, comprobante } = req.body;
