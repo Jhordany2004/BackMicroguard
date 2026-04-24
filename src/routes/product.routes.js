@@ -11,6 +11,6 @@ router.use(verificarToken);
 
 router.get("/sugerencias",  obtenerSugerencias);
 router.get("/buscar", buscarProductos);
-router.get("/codigo/:codigo", obtenerProductoPorCodigo);
+router.get("/:codigo", obtenerProductoPorCodigo);
 
 module.exports = router;

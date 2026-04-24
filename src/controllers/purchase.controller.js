@@ -7,9 +7,9 @@ const Tienda = require("../models/store.model");
 const Categoria = require("../models/category.model");
 const { handleError } = require("../utils/handleError");
 
-const PRODUCTO_PREDETERMINADO = "https://firebasestorage.googleapis.com/v0/b/microguard-2025.firebasestorage.app/o/ProductoPredeterminado.png?alt=media&token=dacd37de-d14b-41ff-b176-894b42943f6b";
+
 const MEDIDAS_VALIDAS = ["lt", "ml", "g", "kg", "kl"];
-const MAXIMO_DIAS_ANTIGUEDAD = 7;
+const MAXIMO_DIAS_ANTIGUEDAD = 1;
 
 const normalizarTexto = (valor) => typeof valor === "string" ? valor.trim() : "";
 const normalizarMedida = (medida) => normalizarTexto(medida).toLowerCase();
@@ -134,7 +134,7 @@ const validarDetalleCompra = (detalle, indice) => {
             cantidadComprada,
             precioCompraUnidad,
             precioVentaUnidad,
-            imagen: normalizarTexto(detalle.Imagen) || PRODUCTO_PREDETERMINADO,
+            imagen: normalizarTexto(detalle.Imagen) || process.env.URL_PRODUCTO_PREDETERMINADO,
             fechaIngreso: fechaIngresoValidada.fecha,
             fechaVencimiento
         }

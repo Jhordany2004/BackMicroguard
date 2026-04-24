@@ -2,7 +2,7 @@ const axios = require("axios");
 
 const sendBrevoEmail = async ({ to, subject, html }) => {
     return axios.post(
-        "https://api.brevo.com/v3/smtp/email",
+        process.env.URL_BREVO_EMAIL,
         {
             sender: {
                 email: process.env.BREVO_SENDER,
