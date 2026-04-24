@@ -6,9 +6,9 @@ const { handleError } = require('../utils/handleError');
 const { success } = require("../utils/handleResponse");
 
 const obtenerTienda = async (idTienda) => {
-  const tienda = await Tienda.findById(idTienda);
-  if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
-  return tienda;
+    const tienda = await Tienda.findById(idTienda);
+    if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
+    return tienda;
 };
 
 const ESTADOS_INVENTARIO = {
@@ -41,7 +41,7 @@ const obtenerInventarioProductos = async (req, res) => {
         // Validar estado
         const estadoNum = estado && estado.trim() !== "" ? parseInt(estado) : null;
         if (estadoNum !== null && (isNaN(estadoNum) || estadoNum < 1 || estadoNum > 5)) {
-            return res.status(400).json({ message: "Estado inválido. Los valores permitidos son del 1 al 5" });
+            return res.status(400).json({ success: false, message: "Estado inválido. Los valores permitidos son del 1 al 5" });
         }
 
         const hoy = new Date();
@@ -213,12 +213,15 @@ const obtenerInventarioProductos = async (req, res) => {
         const totalProductos = resultado.total[0]?.count || 0;
 
         res.status(200).json({
-            ok: true,
-            total: totalProductos,
-            pagina: paginaNum,
-            limite: limiteNum,
-            totalPaginas: Math.ceil(totalProductos / limiteNum),
-            productos: resultado.productos
+            success: true,
+            message: "Productos encontrados",
+            data: resultado.productos,
+            pagination: {
+                total: totalProductos,
+                pagina: paginaNum,
+                limite: limiteNum,
+                totalPaginas: Math.ceil(totalProductos / limiteNum)
+            }
         });
 
     } catch (error) {
@@ -236,7 +239,7 @@ const obtenerDetalleProducto = async (req, res) => {
         const { estadoLote, fechaDesde, fechaHasta } = req.query;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ message: "ID de producto inválido" });
+            return res.status(400).json({ success: false, message: "ID de producto inválido" });
         }
 
         const hoy = new Date();
@@ -440,12 +443,13 @@ const obtenerDetalleProducto = async (req, res) => {
         const [producto] = await Producto.aggregate(pipeline);
 
         if (!producto) {
-            return res.status(404).json({ message: "Producto no encontrado" });
+            return res.status(404).json({ success: false, message: "Producto no encontrado" });
         }
 
         res.status(200).json({
-            ok: true,
-            producto
+            success: true,
+            message: "Producto encontrado",
+            data: producto
         });
 
     } catch (error) {
@@ -552,7 +556,11 @@ const obtenerEstadosDisponibles = async (req, res) => {
                 label: LABELS_ESTADO[estado]
             }));
 
-        res.status(200).json({ ok: true, estados });
+        res.status(200).json({
+            success: true,
+            message: "Estados disponibles",
+            data: estados
+        });
 
     } catch (error) {
         const status = error.status || 500;
@@ -645,12 +653,13 @@ const obtenerEstadoProducto = async (req, res) => {
         const estados = await LoteProducto.aggregate(pipeline);
 
         if (!estados.length) {
-            return res.status(404).json({ message: "No se encontraron lotes para este producto" });
+            return res.status(404).json({ success: false, message: "No se encontraron lotes para este producto" });
         }
 
         res.status(200).json({
-            ok: true,
-            estados
+            success: true,
+            message: "Estados del producto",
+            data: estados
         });
 
     } catch (error) {
