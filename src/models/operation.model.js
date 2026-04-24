@@ -2,7 +2,7 @@ const { Schema, model } = require('mongoose');
 
 const modeloOperacion = new Schema({
     razon: { type: String, required: true },
-    descripcion: { type: String, required: true },
+    descripcion: { type: String, required: false, default: null },
     cantidad: { type: Number, required: true },    
     Tienda: { type: Schema.Types.ObjectId, ref: 'Tienda', required: true },
     lote: {
@@ -21,5 +21,6 @@ const modeloOperacion = new Schema({
 
 modeloOperacion.index({ Tienda: 1, createdAt: -1, estado: 1 });
 modeloOperacion.index({ Tienda: 1, 'lote.loteId': 1 });
+
 
 module.exports = model('Operacion', modeloOperacion);

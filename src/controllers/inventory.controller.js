@@ -226,7 +226,7 @@ const obtenerInventarioProductos = async (req, res) => {
 
     } catch (error) {
         const status = error.status || 500;
-        res.status(status).json({ message: error.message || "Error al filtrar productos" });
+        res.status(status).json({ success: false, message: error.message || "Error al filtrar productos" });
     }
 };
 
@@ -454,7 +454,7 @@ const obtenerDetalleProducto = async (req, res) => {
 
     } catch (error) {
         const status = error.status || 500;
-        res.status(status).json({ message: error.message || "Error al obtener detalle del producto" });
+        res.status(status).json({ success: false, message: error.message || "Error al obtener detalle del producto" });
     }
 };
 
@@ -564,7 +564,7 @@ const obtenerEstadosDisponibles = async (req, res) => {
 
     } catch (error) {
         const status = error.status || 500;
-        res.status(status).json({ message: error.message || "Error al obtener estados disponibles" });
+        res.status(status).json({ success: false, message: error.message || "Error al obtener estados disponibles" });
     }
 };
 
@@ -664,7 +664,7 @@ const obtenerEstadoProducto = async (req, res) => {
 
     } catch (error) {
         const status = error.status || 500;
-        res.status(status).json({ message: error.message || "Error al obtener estados del producto" });
+        res.status(status).json({ success: false, message: error.message || "Error al obtener estados del producto" });
     }
 };
 
