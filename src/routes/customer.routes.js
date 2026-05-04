@@ -4,9 +4,8 @@ const {
     editarCliente,
     listarCliente,
     obtenerCliente,
-    deshabilitarCliente,
-    habilitarCliente,
-    obtenerPorDocumentoYNombre,
+    cambiarEstadoCliente,
+    buscarPorDocumentoYNombre,
 } = require('../controllers/customer.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -18,10 +17,9 @@ router.use(verificarToken);
 router.post('/', registrarCliente);
 router.get('/', listarCliente);
 router.get('/activos', obtenerCliente);
-router.get('/buscar', obtenerPorDocumentoYNombre);
+router.get('/buscar', buscarPorDocumentoYNombre);
 router.get('/:id', obtenerCliente);
 router.put('/:id', editarCliente);
-router.patch('/:id/disable', deshabilitarCliente);
-router.patch('/:id/enable', habilitarCliente);
+router.patch('/estado/:id', cambiarEstadoCliente);
 
 module.exports = router;

@@ -40,7 +40,11 @@ const registrarCategoria = async (req, res) => {
 
         return success(res, {
         message: "Categoria registrado exitosamente",
-        data: categoria
+        data: {
+            id: categoria._id,
+            nombre: categoria.nombre,
+            descripcion: categoria.descripcion,
+        }
         });
     } catch (error) {
         return handleError(res, error, { message: "Error al registrar el categoria" });

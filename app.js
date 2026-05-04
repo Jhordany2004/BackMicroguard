@@ -21,7 +21,9 @@ const ventaRoutes = require("./src/routes/sales.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
 const inventarioRoutes = require("./src/routes/inventory.routes");
 const productRoutes = require("./src/routes/product.routes");
+const serviceRoutes = require("./src/routes/service.routes");
 
+app.use("/servicio", serviceRoutes);
 app.use("/usuario", usuarioRoutes);
 app.use("/proveedor", proveedorRoutes);
 app.use("/cliente", clienteRoutes);

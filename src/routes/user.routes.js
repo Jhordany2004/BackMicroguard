@@ -1,8 +1,6 @@
 const express = require('express');
 const {
     registrarUsuario,
-    verificarRuc,
-    verificarDNI,
     verificarRucDisponible,
     loginUsuario,
     recuperarContraseña,
@@ -15,8 +13,6 @@ const { verificarToken } = require('../middlewares/auth.middleware');
 const router = express.Router();
 
 router.post('/crear', registrarUsuario);
-router.get('/verificarRuc', verificarRuc);
-router.get('/verificarDni', verificarDNI);
 router.get('/verificarRucDisponible', verificarRucDisponible);
 router.post('/login', loginUsuario);
 router.post('/cerrarSesion', verificarToken, cerrarSesion);

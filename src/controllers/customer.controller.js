@@ -1,193 +1,287 @@
 const Cliente = require("../models/customer.model");
 const Tienda = require("../models/store.model");
+const mongoose = require("mongoose");
 
+const obtenerTienda = async (idTienda) => {
+    const tienda = await Tienda.findById(idTienda);
+    if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
+    return tienda;
+};
+
+const normalizarTexto = (valor) => typeof valor === "string" ? valor.trim() : "";
+const escaparRegex = (valor) => valor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const formatearCliente = (cliente) => ({
+    id: cliente._id,
+    documento: cliente.documento,
+    nombre: cliente.nombre,
+    apellido: cliente.apellido,
+    telefono: cliente.telefono || "",
+    estado: cliente.estado,
+    fechaRegistro: cliente.createdAt
+});
+
+const responderError = (res, error, mensaje) => {
+    if (error?.status) {
+        return res.status(error.status).json({ success: false, message: error.message });
+    }
+
+    if (error?.name === "CastError") {
+        return res.status(400).json({ success: false, message: "ID de cliente invalido" });
+    }
+
+    if (error?.code === 11000) {
+        return res.status(409).json({ success: false, message: "Ya existe un cliente con esos datos" });
+    }
+
+    return res.status(500).json({ success: false, message: error.message || mensaje });
+};
+
+const validarObjectId = (id, res) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        res.status(400).json({ success: false, message: "ID de cliente invalido" });
+        return false;
+    }
+
+    return true;
+};
 
 const registrarCliente = async (req, res) => {
     try {
-        const { documento, nombre, apellido } = req.body;
+        const documento = normalizarTexto(req.body.documento);
+        const nombre = normalizarTexto(req.body.nombre);
+        const apellido = normalizarTexto(req.body.apellido);
+        const telefono = normalizarTexto(req.body.telefono);
 
-        const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
-        if (!tienda) {
-        console.log("Tienda no encontrada para el usuario:", req.usuarioId);
-        return res
-            .status(404)
-            .json({ message: "Tienda no encontrada para el usuario" });
-        }
+        const tienda = await obtenerTienda(req.idTienda);
 
-        if (!documento || !nombre || !apellido ) {
-        return res
-            .status(400)
-            .json({ message: "Los campos documento, nombre y apellido son obligatorios" });
+        if (!documento || !nombre || !apellido) {
+            return res.status(400).json({
+                success: false,
+                message: "Los campos documento, nombre y apellido son obligatorios"
+            });
         }
 
         const tiendaId = tienda._id;
 
-        const camposUnicos = [
-            { campo: "documento", valor: documento, mensaje: "Ya existe un cliente con este documento" },
-            { campo: "nombre", valor: nombre, mensaje: "Ya existe un cliente con este nombre" },
-            { campo: "apellido", valor: apellido, mensaje: "Ya existe un cliente con este apellido" }
-        ];
-
-        for (const { campo, valor, mensaje } of camposUnicos) {
-            if (valor) {
-                const existe = await Cliente.findOne({ [campo]: valor, Tienda: tiendaId });
-                if (existe) {
-                    return res.status(409).json({ message: mensaje });
-                }
-            }
+        const documentoExistente = await Cliente.findOne({ documento, Tienda: tiendaId });
+        if (documentoExistente) {
+            return res.status(409).json({
+                success: false,
+                message: "Ya existe un cliente con este documento"
+            });
         }
 
-        nombreCompleto = nombre + " " + apellido;
+        const nombreCompletoExistente = await Cliente.findOne({ nombre, apellido, Tienda: tiendaId });
+        if (nombreCompletoExistente) {
+            return res.status(409).json({
+                success: false,
+                message: "Ya existe un cliente con este nombre y apellido"
+            });
+        }
 
         const cliente = new Cliente({
-        documento,
-        nombre,
-        apellido,
-        telefono: "",
-        Tienda: tiendaId,
+            documento,
+            nombre,
+            apellido,
+            telefono,
+            Tienda: tiendaId
         });
         await cliente.save();
 
-        res.status(201).json({
-        message: "Cliente registrado exitosamente",
-        nombreCompleto,
+        return res.status(201).json({
+            success: true,
+            message: "Cliente registrado exitosamente",
+            data: {
+                cliente: formatearCliente(cliente),
+                nombreCompleto: `${nombre} ${apellido}`
+            }
         });
     } catch (error) {
-        const errorMessage = error.message || "Error al registrar el Cliente";
-        console.log("Error Back-End:", errorMessage);
-        res.status(500).json({ message: errorMessage });
+        return responderError(res, error, "Error al registrar el Cliente");
     }
 };
 
+// Listar todos los clientes sin importar su estado (activo o inactivo)
 const listarCliente = async (req, res) => {
     try {
-        const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
-        }
-        const clienteActivos = await Cliente.find({ Tienda: tienda._id }).limit(50);
-        if (!clienteActivos.length) {
-            return res.status(404).json({ message: "No hay clientes activos" });
-        }
-        res.json(clienteActivos);
+        const tienda = await obtenerTienda(req.idTienda);
+        const clientes = await Cliente.find({ Tienda: tienda._id })
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        return res.status(200).json({
+            success: true,
+            message: clientes.length ? "Clientes obtenidos exitosamente" : "No hay clientes registrados",
+            data: { clientes: clientes.map(formatearCliente) }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al obtener clientes" });
+        return responderError(res, error, "Error al obtener clientes");
     }
 };
 
+// Listar solo los clientes activos o buscar un cliente por ID si viene req.params.id
 const obtenerCliente = async (req, res) => {
     try {
-        const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
+        const tienda = await obtenerTienda(req.idTienda);
+
+        if (req.params.id) {
+            if (!validarObjectId(req.params.id, res)) return;
+
+            const cliente = await Cliente.findOne({
+                _id: req.params.id,
+                Tienda: tienda._id
+            });
+
+            if (!cliente) {
+                return res.status(404).json({ success: false, message: "Cliente no encontrado" });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Cliente obtenido exitosamente",
+                data: { cliente: formatearCliente(cliente) }
+            });
         }
-        const clienteActivos = await Cliente.find({ Tienda: tienda._id, estado: true }).limit(50);
-        if (!clienteActivos.length) {
-            return res.status(404).json({ message: "No hay clientes activos o registre uno" });
-        }
-        res.json(clienteActivos);
+
+        const clientes = await Cliente.find({ Tienda: tienda._id, estado: true })
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        return res.status(200).json({
+            success: true,
+            message: clientes.length ? "Clientes activos obtenidos exitosamente" : "No hay clientes activos o registre uno",
+            data: { clientes: clientes.map(formatearCliente) }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al obtener clientes" });
+        return responderError(res, error, "Error al obtener clientes");
     }
 };
 
-const deshabilitarCliente = async (req, res) => {
+const cambiarEstadoCliente = async (req, res) => {
     try {
         const { id } = req.params;
-        const cliente = await Cliente.findById(id);
+        const { estado } = req.body;
+
+        if (!validarObjectId(id, res)) return;
+
+        if (typeof estado !== "boolean") {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar el campo estado como booleano"
+            });
+        }
+
+        const tienda = await obtenerTienda(req.idTienda);
+        const cliente = await Cliente.findOne({ _id: id, Tienda: tienda._id });
+
         if (!cliente) {
-            return res.status(404).json({ message: "Cliente no encontrado" });
+            return res.status(404).json({ success: false, message: "Cliente no encontrado" });
         }
-        if (!cliente.estado) {
-            return res.status(400).json({ message: "El cliente ya está deshabilitado" });
+
+        if (cliente.estado === estado) {
+            return res.status(400).json({
+                success: false,
+                message: `El cliente ya esta ${estado ? "habilitado" : "deshabilitado"}`
+            });
         }
-        cliente.estado = false;
+
+        cliente.estado = estado;
         await cliente.save();
-        res.json({ message: "Cliente deshabilitado", cliente });
+
+        return res.status(200).json({
+            success: true,
+            message: `Cliente ${estado ? "habilitado" : "deshabilitado"} correctamente`,
+            data: { cliente: formatearCliente(cliente) }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al deshabilitar cliente" });
+        return responderError(res, error, "Error al cambiar estado del cliente");
     }
 };
 
-const habilitarCliente = async (req, res) => {
+const buscarPorDocumentoYNombre = async (req, res) => {
     try {
-        const { id } = req.params;
-        const cliente = await Cliente.findById(id);
-        if (!cliente) {
-            return res.status(404).json({ message: "Cliente no encontrado" });
-        }
-        if (cliente.estado) {
-            return res.status(400).json({ message: "El cliente ya está habilitado" });
-        }
-        cliente.estado = true;
-        await cliente.save();
-        res.json({ message: "Cliente habilitado", cliente });
-    } catch (error) {
-        res.status(500).json({ message: error.message || "Error al habilitar cliente" });
-    }
-};
+        const documento = normalizarTexto(req.query.documento);
+        const nombre = normalizarTexto(req.query.nombre);
 
-const obtenerPorDocumentoYNombre = async (req, res) => {
-    try {
-        const { documento, nombre } = req.query;
-        const tienda = await Tienda.findOne({ Usuario: req.usuarioId });
-        if (!tienda) {
-            return res.status(404).json({ message: "Tienda no encontrada para el usuario" });
+        if (!documento && !nombre) {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar documento o nombre para buscar"
+            });
         }
+
+        const tienda = await obtenerTienda(req.idTienda);
         const filtro = { Tienda: tienda._id, estado: true };
-        if (documento) filtro.documento = documento;
-        if (nombre) filtro.nombre = nombre;
 
-        const clienteActivos = await Cliente.find(filtro);
-        if (!clienteActivos.length) {
-            return res.status(404).json({ message: "No hay clientes activos con esos datos" });
-        }
-        res.json(clienteActivos);
+        if (documento) filtro.documento = documento;
+        if (nombre) filtro.nombre = { $regex: escaparRegex(nombre), $options: "i" };
+
+        const clientes = await Cliente.find(filtro).limit(50);
+
+        return res.status(200).json({
+            success: true,
+            message: clientes.length ? "Clientes encontrados" : "No hay clientes activos con esos datos",
+            data: { clientes: clientes.map(formatearCliente) }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al buscar cliente" });
+        return responderError(res, error, "Error al buscar cliente");
     }
 };
 
 const editarCliente = async (req, res) => {
-    try {        
+    try {
         const { id } = req.params;
-        const { nombre, apellido, telefono } = req.body;
+        if (!validarObjectId(id, res)) return;
 
-        const clienteExistente = await Cliente.findById(id);
+        const nombre = normalizarTexto(req.body.nombre);
+        const apellido = normalizarTexto(req.body.apellido);
+        const telefono = normalizarTexto(req.body.telefono);
+
+        const tienda = await obtenerTienda(req.idTienda);
+        const clienteExistente = await Cliente.findOne({ _id: id, Tienda: tienda._id });
+
         if (!clienteExistente) {
-            return res.status(404).json({ message: "Cliente no encontrado" });
+            return res.status(404).json({ success: false, message: "Cliente no encontrado" });
         }
 
-        if (nombre && nombre !== clienteExistente.nombre) {
-            const existeNom = await Cliente.findOne({ nombre });
-            if (existeNom) {
-                return res.status(409).json({ message: "Ya existe un cliente con este nombre" });
-            }
+        if (!nombre && !apellido) {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar nombre o apellido para actualizar"
+            });
         }
 
-        if (apellido && apellido !== clienteExistente.apellido) {
-            const existeApel = await Cliente.findOne({ apellido });
-            if (existeApel) {
-                return res.status(409).json({ message: "Ya existe un cliente con este apellido" });
-            }
+        const nombreFinal = nombre || clienteExistente.nombre;
+        const apellidoFinal = apellido || clienteExistente.apellido;
+
+        const clienteConMismoNombre = await Cliente.findOne({
+            _id: { $ne: id },
+            Tienda: tienda._id,
+            nombre: nombreFinal,
+            apellido: apellidoFinal
+        });
+
+        if (clienteConMismoNombre) {
+            return res.status(409).json({
+                success: false,
+                message: "Ya existe un cliente con este nombre y apellido"
+            });
         }
 
-        if (telefono && telefono !== clienteExistente.telefono) {
-            const existeTel = await Cliente.findOne({ telefono });
-            if (existeTel) {
-                return res.status(409).json({ message: "Ya existe un cliente con este telefono" });
-            }
-        }
-
-        clienteExistente.nombre = nombre ?? clienteExistente.nombre;
-        clienteExistente.apellido = apellido ?? clienteExistente.apellido;
-        clienteExistente.telefono = telefono ?? clienteExistente.telefono;
+        clienteExistente.nombre = nombreFinal;
+        clienteExistente.apellido = apellidoFinal;
+        clienteExistente.telefono = telefono || clienteExistente.telefono;
 
         await clienteExistente.save();
 
-        res.json({ message: "Cliente editado exitosamente", cliente: clienteExistente });
+        return res.status(200).json({
+            success: true,
+            message: "Cliente editado exitosamente",
+            data: { cliente: formatearCliente(clienteExistente) }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message || "Error al editar Cliente" });
+        return responderError(res, error, "Error al editar Cliente");
     }
 };
 
@@ -195,8 +289,7 @@ module.exports = {
     registrarCliente,
     obtenerCliente,
     listarCliente,
-    deshabilitarCliente,
-    habilitarCliente,
-    obtenerPorDocumentoYNombre,
+    cambiarEstadoCliente,
+    buscarPorDocumentoYNombre,
     editarCliente
 };

@@ -10,6 +10,7 @@ const { fetchRuc } = require('../services/ruc.service');
 const { handleError } = require('../utils/handleError');
 const { success } = require("../utils/handleResponse");
 const sendBrevoEmail  = require('../config/mailer');
+const { messaging } = require("firebase-admin");
 
 const registrarUsuario = async (req, res) => {
     let session = null;
@@ -476,68 +477,7 @@ const verificarRucDisponible = async (req, res) => {
     }
 };
 
-const verificarRuc = async (req, res) => {
-    const { ruc } = req.query;
-    if (!ruc || !/^\d{11}$/.test(ruc)) {
-        return res.status(400).json({ message: 'RUC debe tener 11 dígitos numéricos' });
-    }
-    try {
-        const response = await fetch(`https://consultaruc.win/api/ruc/${ruc}`);
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            return res.status(502).json({ success: false, message: 'Error al consultar el RUC. Respuesta inválida del proveedor.' });
-        }
-        const data = await response.json();
-        if (data && data.result && data.result.estado) {
-            return res.status(200).json({
-                success: true,
-                estado: data.result.estado,
-                RazonSocial: data.result.razon_social
-            });
-        } else {
-            return res.status(404).json({ success: false, message: 'RUC no encontrado o inválido' });
-        }
-    } catch (error) {
-        return handleError(res, error, {
-            statusCode: 502,
-            message: "Error al consultar el proveedor externo RUC",
-        });
-    }
-};
 
-const verificarDNI = async (req, res) => {
-    const { dni } = req.query;
-    if (!dni || !/^\d{8}$/.test(dni)) {
-        return res.status(400).json({ message: 'DNI debe tener 8 dígitos numéricos' });
-    }
-    try {
-        const apiKey = process.env.API_KEY_DNI;
-        const url = `https://dniruc.apisperu.com/api/v1/dni/${dni}?token=${apiKey}`;
-        const response = await fetch(url);
-        
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            return res.status(502).json({ message: 'Error al consultar el DNI. Respuesta inválida del proveedor.' });
-        }
-        const data = await response.json();
-
-        if (data && data.success) {
-            const nombreCompleto = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`;
-            return res.status(200).json({
-                success: true,
-                estado: data.success,                
-                nombreCompleto: nombreCompleto
-            });
-        } else {
-            return res.status(404).json({ success: false, message: 'DNI no encontrado o inválido' });
-        }
-    } catch (error) {
-        return handleError(res, error, {
-            statusCode: 502,
-            message: "Error al consultar el proveedor externo DNI",
-        });
-    }
-};
 
 //Exportacion de modulos
 module.exports = {
@@ -546,7 +486,5 @@ module.exports = {
     recuperarContraseña,
     restablecerContraseña,
     cerrarSesion,
-    verificarRuc,
-    verificarDNI,
     verificarRucDisponible,
 };
