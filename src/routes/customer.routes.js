@@ -20,6 +20,6 @@ router.get('/activos', obtenerCliente);
 router.get('/buscar', buscarPorDocumentoYNombre);
 router.get('/:id', obtenerCliente);
 router.put('/:id', editarCliente);
-router.patch('/estado/:id', cambiarEstadoCliente);
+router.patch('/:id/estado', cambiarEstadoCliente);
 
 module.exports = router;

@@ -1,325 +1,354 @@
-const mongoose = require("mongoose");
-const Proveedor = require("../models/supplier.model");
-const Tienda = require("../models/store.model");
+const { query } = require("../config/database");
 
-const normalizarTexto = (texto) => typeof texto === "string" ? texto.trim().toUpperCase() : "";
-const normalizarDocumento = (doc) => typeof doc === "string" ? doc.trim() : "";
-const escaparRegex = (valor) => valor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const normalizarTexto = (valor) => typeof valor === "string" ? valor.trim() : "";
+const normalizarMayusculas = (valor) => normalizarTexto(valor).toUpperCase();
 
 const formatearProveedor = (proveedor) => ({
-  id: proveedor._id,
-  tipoProveedor: proveedor.tipoProveedor,
-  documento: proveedor.documento,
-  razonSocial: proveedor.razonSocial,
-  telefono: proveedor.telefono || "",
-  estado: proveedor.estado,
-  fechaRegistro: proveedor.createdAt
+    id: proveedor.id,
+    tipoProveedor: proveedor.tipo_proveedor,
+    documento: proveedor.documento,
+    razonSocial: proveedor.razon_social,
+    telefono: proveedor.telefono || "",
+    estado: proveedor.estado,
+    fechaRegistro: proveedor.fecharegistro,
+    fechaModificacion: proveedor.fechamodificacion
 });
 
 const responderError = (res, error, mensaje) => {
-  if (error?.status) {
-    return res.status(error.status).json({ success: false, message: error.message });
-  }
+    if (error?.code === "23505") {
+        return res.status(409).json({
+            success: false,
+            message: "Documento o razon social ya existe"
+        });
+    }
 
-  if (error?.name === "CastError") {
-    return res.status(400).json({ success: false, message: "ID de proveedor invalido" });
-  }
-
-  if (error?.code === 11000) {
-    return res.status(409).json({ success: false, message: "Documento o razon social ya existe" });
-  }
-
-  return res.status(500).json({ success: false, message: error.message || mensaje });
+    return res.status(500).json({
+        success: false,
+        message: error.message || mensaje
+    });
 };
 
-const validarObjectId = (id, res) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    res.status(400).json({ success: false, message: "ID de proveedor invalido" });
+const validarId = (id, res) => {
+    const numero = Number(id);
+
+    if (!Number.isInteger(numero) || numero <= 0) {
+        res.status(400).json({
+            success: false,
+            message: "ID de proveedor invalido"
+        });
+        return null;
+    }
+
+    return numero;
+};
+
+const validarTienda = (req, res) => {
+    if (!req.idTienda) {
+        res.status(403).json({
+            success: false,
+            message: "Usuario sin tienda asociada"
+        });
+        return false;
+    }
+
+    return true;
+};
+
+const validarDocumento = (tipoProveedor, documento) => {
+    if (tipoProveedor === "Natural") return /^\d{8}$/.test(documento);
+    if (tipoProveedor === "Empresa") return /^\d{11}$/.test(documento);
     return false;
-  }
-
-  return true;
-};
-
-const validarDocumento = (tipo, doc) => {
-  if (tipo === "Natural" && doc.length !== 8) return false;
-  if (tipo === "Empresa" && doc.length !== 11) return false;
-  return true;
-};
-
-const obtenerTienda = async (idTienda) => {
-  const tienda = await Tienda.findById(idTienda);
-  if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
-  return tienda;
 };
 
 const registrarProveedor = async (req, res) => {
-  try {
-    const tipoProveedor = req.body.tipoProveedor;
-    const documento = normalizarDocumento(req.body.documento);
-    const razonSocial = normalizarTexto(req.body.razonSocial);
-    const telefono = normalizarDocumento(req.body.telefono);
+    try {
+        if (!validarTienda(req, res)) return;
 
-    if (!tipoProveedor || !documento || !razonSocial) {
-      return res.status(400).json({
-        success: false,
-        message: "Tipo, documento y razon social son obligatorios"
-      });
+        const tipoProveedor = normalizarTexto(req.body.tipoProveedor);
+        const documento = normalizarTexto(req.body.documento);
+        const razonSocial = normalizarMayusculas(req.body.razonSocial);
+        const telefono = normalizarTexto(req.body.telefono);
+
+        if (!tipoProveedor || !documento || !razonSocial) {
+            return res.status(400).json({
+                success: false,
+                message: "Tipo, documento y razon social son obligatorios"
+            });
+        }
+
+        if (!["Natural", "Empresa"].includes(tipoProveedor)) {
+            return res.status(400).json({
+                success: false,
+                message: "Tipo de proveedor invalido"
+            });
+        }
+
+        if (!validarDocumento(tipoProveedor, documento)) {
+            return res.status(400).json({
+                success: false,
+                message: "Documento no valido para el tipo de proveedor"
+            });
+        }
+
+        const result = await query(
+            `INSERT INTO proveedores (tienda_id, tipo_proveedor, documento, razon_social, telefono)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion`,
+            [req.idTienda, tipoProveedor, documento, razonSocial, telefono || null]
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "Proveedor registrado correctamente",
+            data: { proveedor: formatearProveedor(result.rows[0]) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al registrar proveedor");
     }
-
-    if (!["Natural", "Empresa"].includes(tipoProveedor)) {
-      return res.status(400).json({
-        success: false,
-        message: "Tipo de proveedor invalido"
-      });
-    }
-
-    if (!validarDocumento(tipoProveedor, documento)) {
-      return res.status(400).json({
-        success: false,
-        message: "Documento no valido para el tipo de proveedor"
-      });
-    }
-
-    const tienda = await obtenerTienda(req.idTienda);
-
-    const proveedorExistente = await Proveedor.findOne({
-      Tienda: tienda._id,
-      estado: true,
-      $or: [{ documento }, { razonSocial }]
-    });
-
-    if (proveedorExistente) {
-      return res.status(409).json({
-        success: false,
-        message: "Ya existe un proveedor activo con ese documento o razon social"
-      });
-    }
-
-    const proveedor = await Proveedor.create({
-      tipoProveedor,
-      documento,
-      razonSocial,
-      telefono,
-      Tienda: tienda._id
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Proveedor registrado correctamente",
-      data: { proveedor: formatearProveedor(proveedor) }
-    });
-  } catch (error) {
-    return responderError(res, error, "Error al registrar proveedor");
-  }
 };
 
 const listarProveedores = async (req, res) => {
-  try {
-    const tienda = await obtenerTienda(req.idTienda);
+    try {
+        if (!validarTienda(req, res)) return;
 
-    const proveedores = await Proveedor
-      .find({ Tienda: tienda._id })
-      .sort({ createdAt: -1 })
-      .limit(50);
+        const result = await query(
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+             FROM proveedores
+             WHERE tienda_id = $1
+             ORDER BY fechaRegistro DESC
+             LIMIT 50`,
+            [req.idTienda]
+        );
 
-    return res.status(200).json({
-      success: true,
-      message: proveedores.length ? "Proveedores obtenidos correctamente" : "No se encontraron proveedores",
-      data: { proveedores: proveedores.map(formatearProveedor) }
-    });
-  } catch (error) {
-    return responderError(res, error, "Error al listar proveedores");
-  }
+        return res.status(200).json({
+            success: true,
+            message: result.rows.length ? "Proveedores obtenidos correctamente" : "No hay proveedores registrados",
+            data: { proveedores: result.rows.map(formatearProveedor) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al listar proveedores");
+    }
 };
 
 const obtenerProveedores = async (req, res) => {
-  try {
-    const tienda = await obtenerTienda(req.idTienda);
+    try {
+        if (!validarTienda(req, res)) return;
 
-    const proveedores = await Proveedor
-      .find({ Tienda: tienda._id, estado: true })
-      .sort({ createdAt: -1 })
-      .limit(50);
+        const result = await query(
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+             FROM proveedores
+             WHERE tienda_id = $1 AND estado = TRUE
+             ORDER BY razon_social ASC
+             LIMIT 50`,
+            [req.idTienda]
+        );
 
-    return res.status(200).json({
-      success: true,
-      message: proveedores.length ? "Proveedores activos obtenidos correctamente" : "No se encontraron proveedores activos",
-      data: { proveedores: proveedores.map(formatearProveedor) }
-    });
-  } catch (error) {
-    return responderError(res, error, "Error al obtener proveedores activos");
-  }
+        return res.status(200).json({
+            success: true,
+            message: result.rows.length ? "Proveedores activos obtenidos correctamente" : "No hay proveedores activos",
+            data: { proveedores: result.rows.map(formatearProveedor) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al obtener proveedores activos");
+    }
 };
 
 const obtenerProveedorPorID = async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!validarObjectId(id, res)) return;
+    try {
+        if (!validarTienda(req, res)) return;
 
-    const tienda = await obtenerTienda(req.idTienda);
+        const id = validarId(req.params.id, res);
+        if (!id) return;
 
-    const proveedor = await Proveedor.findOne({
-      _id: id,
-      Tienda: tienda._id
-    });
+        const result = await query(
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+             FROM proveedores
+             WHERE id = $1 AND tienda_id = $2
+             LIMIT 1`,
+            [id, req.idTienda]
+        );
 
-    if (!proveedor) {
-      return res.status(404).json({ success: false, message: "Proveedor no encontrado" });
+        if (!result.rows.length) {
+            return res.status(404).json({
+                success: false,
+                message: "Proveedor no encontrado"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Proveedor obtenido correctamente",
+            data: { proveedor: formatearProveedor(result.rows[0]) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al obtener proveedor");
     }
-
-    return res.status(200).json({
-      success: true,
-      message: "Proveedor obtenido correctamente",
-      data: { proveedor: formatearProveedor(proveedor) }
-    });
-  } catch (error) {
-    return responderError(res, error, "Error al obtener proveedor");
-  }
-};
-
-const cambiarEstadoProveedor = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { estado } = req.body;
-
-    if (!validarObjectId(id, res)) return;
-
-    if (typeof estado !== "boolean") {
-      return res.status(400).json({
-        success: false,
-        message: "Debe enviar el campo estado como booleano"
-      });
-    }
-
-    const tienda = await obtenerTienda(req.idTienda);
-
-    const proveedor = await Proveedor.findOne({
-      _id: id,
-      Tienda: tienda._id
-    });
-
-    if (!proveedor) {
-      return res.status(404).json({ success: false, message: "Proveedor no encontrado" });
-    }
-
-    if (proveedor.estado === estado) {
-      return res.status(400).json({
-        success: false,
-        message: `El proveedor ya esta ${estado ? "habilitado" : "deshabilitado"}`
-      });
-    }
-
-    proveedor.estado = estado;
-    await proveedor.save();
-
-    return res.status(200).json({
-      success: true,
-      message: `Proveedor ${estado ? "habilitado" : "deshabilitado"} correctamente`,
-      data: { proveedor: formatearProveedor(proveedor) }
-    });
-  } catch (error) {
-    return responderError(res, error, "Error al cambiar estado del proveedor");
-  }
 };
 
 const obtenerPorDocumentoYRazonSocial = async (req, res) => {
-  try {
-    const documento = normalizarDocumento(req.query.documento);
-    const razonSocial = normalizarTexto(req.query.razonSocial);
+    try {
+        if (!validarTienda(req, res)) return;
 
-    if (!documento && !razonSocial) {
-      return res.status(400).json({
-        success: false,
-        message: "Debe enviar documento o razon social para buscar"
-      });
+        const documento = normalizarTexto(req.query.documento);
+        const razonSocial = normalizarMayusculas(req.query.razonSocial);
+
+        if (!documento && !razonSocial) {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar documento o razon social para buscar"
+            });
+        }
+
+        const filtros = ["tienda_id = $1", "estado = TRUE"];
+        const valores = [req.idTienda];
+
+        if (documento) {
+            valores.push(documento);
+            filtros.push(`documento = $${valores.length}`);
+        }
+
+        if (razonSocial) {
+            valores.push(`%${razonSocial}%`);
+            filtros.push(`razon_social ILIKE $${valores.length}`);
+        }
+
+        const result = await query(
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+             FROM proveedores
+             WHERE ${filtros.join(" AND ")}
+             ORDER BY razon_social ASC
+             LIMIT 50`,
+            valores
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: result.rows.length ? "Proveedores encontrados" : "No hay proveedores activos con esos datos",
+            data: { proveedores: result.rows.map(formatearProveedor) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al buscar proveedor");
     }
-
-    const tienda = await obtenerTienda(req.idTienda);
-
-    const filtro = {
-      Tienda: tienda._id,
-      estado: true
-    };
-
-    if (documento) filtro.documento = documento;
-    if (razonSocial) filtro.razonSocial = { $regex: escaparRegex(razonSocial), $options: "i" };
-
-    const proveedores = await Proveedor.find(filtro).limit(50);
-
-    return res.status(200).json({
-      success: true,
-      message: proveedores.length ? "Proveedores encontrados" : "No hay proveedores activos con esos datos",
-      data: { proveedores: proveedores.map(formatearProveedor) }
-    });
-  } catch (error) {
-    return responderError(res, error, "Error al buscar proveedor");
-  }
 };
 
 const editarProveedor = async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!validarObjectId(id, res)) return;
+    try {
+        if (!validarTienda(req, res)) return;
 
-    const razonSocial = normalizarTexto(req.body.razonSocial);
-    const telefono = normalizarDocumento(req.body.telefono);
+        const id = validarId(req.params.id, res);
+        if (!id) return;
 
-    if (!razonSocial && !telefono) {
-      return res.status(400).json({
-        success: false,
-        message: "Debe enviar razon social o telefono para actualizar"
-      });
-    }
+        const razonSocial = normalizarMayusculas(req.body.razonSocial);
+        const telefono = normalizarTexto(req.body.telefono);
 
-    const tienda = await obtenerTienda(req.idTienda);
+        if (!razonSocial && !telefono) {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar razon social o telefono para actualizar"
+            });
+        }
 
-    const proveedor = await Proveedor.findOne({
-      _id: id,
-      Tienda: tienda._id
-    });
+        const actual = await query(
+            `SELECT id, razon_social, telefono
+             FROM proveedores
+             WHERE id = $1 AND tienda_id = $2
+             LIMIT 1`,
+            [id, req.idTienda]
+        );
 
-    if (!proveedor) {
-      return res.status(404).json({ success: false, message: "Proveedor no encontrado" });
-    }
+        if (!actual.rows.length) {
+            return res.status(404).json({
+                success: false,
+                message: "Proveedor no encontrado"
+            });
+        }
 
-    if (razonSocial && razonSocial !== proveedor.razonSocial) {
-      const proveedorConMismaRazon = await Proveedor.findOne({
-        _id: { $ne: id },
-        Tienda: tienda._id,
-        estado: true,
-        razonSocial
-      });
+        const razonSocialFinal = razonSocial || actual.rows[0].razon_social;
+        const telefonoFinal = telefono || actual.rows[0].telefono;
 
-      if (proveedorConMismaRazon) {
-        return res.status(409).json({
-          success: false,
-          message: "Ya existe un proveedor activo con esa razon social"
+        const result = await query(
+            `UPDATE proveedores
+             SET razon_social = $1,
+                 telefono = $2,
+                 fechaModificacion = NOW()
+             WHERE id = $3 AND tienda_id = $4
+             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion`,
+            [razonSocialFinal, telefonoFinal || null, id, req.idTienda]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Proveedor actualizado correctamente",
+            data: { proveedor: formatearProveedor(result.rows[0]) }
         });
-      }
+    } catch (error) {
+        return responderError(res, error, "Error al editar proveedor");
     }
+};
 
-    proveedor.razonSocial = razonSocial || proveedor.razonSocial;
-    proveedor.telefono = telefono || proveedor.telefono;
+const cambiarEstadoProveedor = async (req, res) => {
+    try {
+        if (!validarTienda(req, res)) return;
 
-    await proveedor.save();
+        const id = validarId(req.params.id, res);
+        if (!id) return;
 
-    return res.status(200).json({
-      success: true,
-      message: "Proveedor actualizado correctamente",
-      data: { proveedor: formatearProveedor(proveedor) }
-    });
-  } catch (error) {
-    return responderError(res, error, "Error al editar proveedor");
-  }
+        const { estado } = req.body;
+
+        if (typeof estado !== "boolean") {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar el campo estado como booleano"
+            });
+        }
+
+        const actual = await query(
+            `SELECT id, estado
+             FROM proveedores
+             WHERE id = $1 AND tienda_id = $2
+             LIMIT 1`,
+            [id, req.idTienda]
+        );
+
+        if (!actual.rows.length) {
+            return res.status(404).json({
+                success: false,
+                message: "Proveedor no encontrado"
+            });
+        }
+
+        if (actual.rows[0].estado === estado) {
+            return res.status(400).json({
+                success: false,
+                message: `El proveedor ya esta ${estado ? "habilitado" : "deshabilitado"}`
+            });
+        }
+
+        const result = await query(
+            `UPDATE proveedores
+             SET estado = $1,
+                 fechaModificacion = NOW()
+             WHERE id = $2 AND tienda_id = $3
+             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion`,
+            [estado, id, req.idTienda]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: `Proveedor ${estado ? "habilitado" : "deshabilitado"} correctamente`,
+            data: { proveedor: formatearProveedor(result.rows[0]) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al cambiar estado del proveedor");
+    }
 };
 
 module.exports = {
-  registrarProveedor,
-  obtenerProveedores,
-  obtenerProveedorPorID,
-  listarProveedores,
-  cambiarEstadoProveedor,
-  obtenerPorDocumentoYRazonSocial,
-  editarProveedor
+    registrarProveedor,
+    obtenerProveedores,
+    obtenerProveedorPorID,
+    listarProveedores,
+    cambiarEstadoProveedor,
+    obtenerPorDocumentoYRazonSocial,
+    editarProveedor
 };

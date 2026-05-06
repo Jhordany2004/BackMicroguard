@@ -1,263 +1,275 @@
-const Categoria = require("../models/category.model");
-const Tienda = require("../models/store.model");
-const { handleError } = require('../utils/handleError');
-const { success } = require('../utils/handleResponse');
-const { formatDatePeru } = require("../utils/formatDate");
+const { query } = require("../config/database");
 
-const obtenerTienda = async (idTienda) => {
-    const tienda = await Tienda.findById(idTienda);
-    if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
-    return tienda;
+const normalizarTexto = (valor) => typeof valor === "string" ? valor.trim() : "";
+
+const formatearCategoria = (categoria) => ({
+    id: categoria.id,
+    nombre: categoria.nombre,
+    descripcion: categoria.descripcion || "",
+    estado: categoria.estado,
+    fechaRegistro: categoria.fecharegistro,
+    fechaModificacion: categoria.fechamodificacion
+});
+
+const responderError = (res, error, mensaje) => {
+    if (error?.code === "23505") {
+        return res.status(409).json({
+            success: false,
+            message: "Ya existe una categoria con ese nombre"
+        });
+    }
+
+    return res.status(500).json({
+        success: false,
+        message: error.message || mensaje
+    });
+};
+
+const validarId = (id, res) => {
+    const numero = Number(id);
+
+    if (!Number.isInteger(numero) || numero <= 0) {
+        res.status(400).json({
+            success: false,
+            message: "ID de categoria invalido"
+        });
+        return null;
+    }
+
+    return numero;
 };
 
 const registrarCategoria = async (req, res) => {
     try {
-        const { nombre, descripcion} = req.body;
+        const nombre = normalizarTexto(req.body.nombre);
+        const descripcion = normalizarTexto(req.body.descripcion);
 
-        const tienda = await obtenerTienda(req.idTienda);        
+        if (!req.idTienda) {
+            return res.status(403).json({
+                success: false,
+                message: "Usuario sin tienda asociada"
+            });
+        }
 
         if (!nombre) {
-        return res
-            .status(400)
-            .json({ message: "El campo de nombre es obligatorios" });
+            return res.status(400).json({
+                success: false,
+                message: "El nombre es obligatorio"
+            });
         }
 
-        const tiendaId = tienda._id;
+        const result = await query(
+            `INSERT INTO categorias (tienda_id, nombre, descripcion)
+             VALUES ($1, $2, $3)
+             RETURNING id, nombre, descripcion, estado, fechaRegistro, fechaModificacion`,
+            [req.idTienda, nombre, descripcion || null]
+        );
 
-        const existe = await Categoria.findOne({ "nombre": nombre, Tienda: tiendaId });
-        if (existe) {
-            return res
-            .status(409)
-            .json({ message: "Ya existe un categoria con ese nombre" });
-        }          
-
-        const categoria = new Categoria({        
-        nombre,        
-        descripcion,
-        Tienda: tiendaId,
-        });
-        await categoria.save();
-
-        return success(res, {
-        message: "Categoria registrado exitosamente",
-        data: {
-            id: categoria._id,
-            nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-        }
+        return res.status(201).json({
+            success: true,
+            message: "Categoria registrada correctamente",
+            data: { categoria: formatearCategoria(result.rows[0]) }
         });
     } catch (error) {
-        return handleError(res, error, { message: "Error al registrar el categoria" });
+        return responderError(res, error, "Error al registrar categoria");
     }
 };
 
-
-//Listar todas las categorias de la tienda, sin importar su estado (activa o inactiva)
 const listarCategoria = async (req, res) => {
     try {
-        const tienda = await obtenerTienda(req.idTienda);
-        
-        const categoriaActivo = await Categoria.find({ Tienda: tienda._id});
-        if (!categoriaActivo.length) {
-            return res.status(404).json({ message: "No hay categorias activas" });
-        }
-        const categorias = categoriaActivo.map(categoria => ({
-            _id: categoria._id,
-            nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-            fechaCreacion: formatDatePeru(categoria.createdAt),
-            estado: categoria.estado      
-        }));
-        return success(res, {message: "Categorias activas obtenidas correctamente", data: categorias});
-    } catch (error) {
-        return handleError(res, error, { message: "Error al obtener categorias" });
-    }
-};  
+        const result = await query(
+            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+             FROM categorias
+             WHERE tienda_id = $1
+             ORDER BY fechaRegistro DESC`,
+            [req.idTienda]
+        );
 
-//Listar solo las categorias activas de la tienda (Por ejemplo para tabla de venta o compras)
+        return res.status(200).json({
+            success: true,
+            message: result.rows.length ? "Categorias obtenidas correctamente" : "No hay categorias registradas",
+            data: { categorias: result.rows.map(formatearCategoria) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al listar categorias");
+    }
+};
+
 const obtenerCategoria = async (req, res) => {
     try {
-        const tienda = await obtenerTienda(req.idTienda);
+        const result = await query(
+            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+             FROM categorias
+             WHERE tienda_id = $1 AND estado = TRUE
+             ORDER BY nombre ASC`,
+            [req.idTienda]
+        );
 
-        const categoriaActivo = await Categoria.find({ Tienda: tienda._id, estado: true });
-        if (!categoriaActivo.length) {
-            return res.status(404).json({ message: "No hay categorias activas o registre uno" });
-        }
-        const categorias = categoriaActivo.map(categoria => ({
-            _id: categoria._id,
-            nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-            fechaCreacion: formatDatePeru(categoria.createdAt),
-            estado: categoria.estado
-        }));
-        return success(res, {message: "Categorias activas obtenidas correctamente", data: categorias});
+        return res.status(200).json({
+            success: true,
+            message: result.rows.length ? "Categorias activas obtenidas correctamente" : "No hay categorias activas",
+            data: { categorias: result.rows.map(formatearCategoria) }
+        });
     } catch (error) {
-        return handleError(res, error, { message: "Error al obtener categorias" });
+        return responderError(res, error, "Error al obtener categorias activas");
     }
 };
 
 const obtenerCategoriasInactivas = async (req, res) => {
     try {
-        const tienda = await obtenerTienda(req.idTienda);
-        
-        const categoriaActivo = await Categoria.find({ Tienda: tienda._id, estado: false });
-        if (!categoriaActivo.length) {
-            return res.status(404).json({ message: "No hay categorias inactivas o registre uno" });
-        }
-        const categorias = categoriaActivo.map(categoria => ({
-            _id: categoria._id,
-            nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-            fechaCreacion: formatDatePeru(categoria.createdAt),
-            estado: categoria.estado
-        }));
-        return success(res, {message: "Categorias inactivas obtenidas correctamente", data: categorias});
+        const result = await query(
+            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+             FROM categorias
+             WHERE tienda_id = $1 AND estado = FALSE
+             ORDER BY nombre ASC`,
+            [req.idTienda]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: result.rows.length ? "Categorias inactivas obtenidas correctamente" : "No hay categorias inactivas",
+            data: { categorias: result.rows.map(formatearCategoria) }
+        });
     } catch (error) {
-        return handleError(res, error, { message: "Error al obtener categorias" });
+        return responderError(res, error, "Error al obtener categorias inactivas");
     }
 };
 
-//Buscar una categoría específica por ID, con estado activo.
 const buscarCategoria = async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = validarId(req.params.id, res);
+        if (!id) return;
 
-        if (!id) {
-            return res.status(400).json({ message: "El ID de la categoría es requerido" });
+        const result = await query(
+            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+             FROM categorias
+             WHERE id = $1 AND tienda_id = $2
+             LIMIT 1`,
+            [id, req.idTienda]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({
+                success: false,
+                message: "Categoria no encontrada"
+            });
         }
 
-        const tienda = await obtenerTienda(req.idTienda);
-
-        const categoria = await Categoria.findOne({ estado: true, _id: id, Tienda: tienda._id });
-        if (!categoria) {
-            return res.status(404).json({ message: "Categoría no encontrada" });
-        }
-
-        const categoriaFormato = {
-            _id: categoria._id,
-            nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-            fechaCreacion: formatDatePeru(categoria.createdAt),
-            estado: categoria.estado    
-        };
-
-        return success(res, { message: "Categoría obtenida correctamente", data: categoriaFormato });
+        return res.status(200).json({
+            success: true,
+            message: "Categoria obtenida correctamente",
+            data: { categoria: formatearCategoria(result.rows[0]) }
+        });
     } catch (error) {
-        return handleError(res, error, { message: "Error al buscar la categoría" });
+        return responderError(res, error, "Error al buscar categoria");
     }
 };
 
 const editarCategoria = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { nombre, descripcion } = req.body;
+        const id = validarId(req.params.id, res);
+        if (!id) return;
 
-        const tienda = await obtenerTienda(req.idTienda);
+        const nombre = normalizarTexto(req.body.nombre);
+        const descripcion = normalizarTexto(req.body.descripcion);
 
-        const categoriaExistente = await Categoria.findOne({
-            _id: id,
-            Tienda: tienda._id
-        });
+        if (!nombre && !descripcion) {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar nombre o descripcion para actualizar"
+            });
+        }
 
-        if (!categoriaExistente) {
+        const actual = await query(
+            `SELECT id, nombre, descripcion
+             FROM categorias
+             WHERE id = $1 AND tienda_id = $2
+             LIMIT 1`,
+            [id, req.idTienda]
+        );
+
+        if (!actual.rows.length) {
             return res.status(404).json({
-                status: false,
-                message: "Categoría no encontrada en esta tienda"
+                success: false,
+                message: "Categoria no encontrada"
             });
         }
 
-        if (nombre && nombre !== categoriaExistente.nombre) {
-            const existeNom = await Categoria.findOne({
-                nombre,
-                Tienda: tienda._id,
-                _id: { $ne: id }
+        const nombreFinal = nombre || actual.rows[0].nombre;
+        const descripcionFinal = descripcion || actual.rows[0].descripcion;
+
+        const result = await query(
+            `UPDATE categorias
+             SET nombre = $1,
+                 descripcion = $2,
+                 fechaModificacion = NOW()
+             WHERE id = $3 AND tienda_id = $4
+             RETURNING id, nombre, descripcion, estado, fechaRegistro, fechaModificacion`,
+            [nombreFinal, descripcionFinal || null, id, req.idTienda]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Categoria actualizada correctamente",
+            data: { categoria: formatearCategoria(result.rows[0]) }
+        });
+    } catch (error) {
+        return responderError(res, error, "Error al editar categoria");
+    }
+};
+
+const cambiarEstadoCategoria = async (req, res) => {
+    try {
+        const id = validarId(req.params.id, res);
+        if (!id) return;
+
+        const { estado } = req.body;
+
+        if (typeof estado !== "boolean") {
+            return res.status(400).json({
+                success: false,
+                message: "Debe enviar el campo estado como booleano"
             });
-
-            if (existeNom) {
-                return res.status(409).json({
-                    status: false,
-                    message: "Ya existe una categoría con este nombre en esta tienda"
-                });
-            }
         }
 
-        categoriaExistente.nombre = nombre ?? categoriaExistente.nombre;
-        categoriaExistente.descripcion = descripcion ?? categoriaExistente.descripcion;
+        const actual = await query(
+            `SELECT id, estado
+             FROM categorias
+             WHERE id = $1 AND tienda_id = $2
+             LIMIT 1`,
+            [id, req.idTienda]
+        );
 
-        await categoriaExistente.save();
+        if (!actual.rows.length) {
+            return res.status(404).json({
+                success: false,
+                message: "Categoria no encontrada"
+            });
+        }
 
-        const categoriaEditada = {
-            _id: categoriaExistente._id,
-            nombre: categoriaExistente.nombre,
-            descripcion: categoriaExistente.descripcion,
-            estado: categoriaExistente.estado,
-            fechaCreacion: formatDatePeru(categoriaExistente.createdAt)
-        };
+        if (actual.rows[0].estado === estado) {
+            return res.status(400).json({
+                success: false,
+                message: `La categoria ya esta ${estado ? "habilitada" : "deshabilitada"}`
+            });
+        }
 
-        return success(res, {
-            message: "Categoría editada exitosamente",
-            data: categoriaEditada
+        const result = await query(
+            `UPDATE categorias
+             SET estado = $1,
+                 fechaModificacion = NOW()
+             WHERE id = $2 AND tienda_id = $3
+             RETURNING id, nombre, descripcion, estado, fechaRegistro, fechaModificacion`,
+            [estado, id, req.idTienda]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: `Categoria ${estado ? "habilitada" : "deshabilitada"} correctamente`,
+            data: { categoria: formatearCategoria(result.rows[0]) }
         });
-
     } catch (error) {
-        return handleError(res, error, {
-            message: "Error al editar la categoría"
-        });
-    }
-};
-
-
-const deshabilitarCategoria = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const categoria = await Categoria.findById(id);
-        if (!categoria) {
-            return res.status(404).json({ message: "Categoria no encontrado" });
-        }
-        if (!categoria.estado) {
-            return res.status(400).json({ message: "El categoria ya está deshabilitada" });
-        }
-        categoria.estado = false;
-        await categoria.save();
-
-        const categoriaDeshabilitada = {
-            _id: categoria._id,
-            nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-            fechaCreacion: formatDatePeru(categoria.createdAt),
-            estado: categoria.estado   
-        };
-
-        return success(res,{ message: "Categoria deshabilitada", data: categoriaDeshabilitada });
-    } catch (error) {
-        return handleError(res, error, { message: "Error al deshabilitar categoria" });
-    }
-};
-
-const habilitarCategoria = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const categoria = await Categoria.findById(id);
-        if (!categoria) {
-            return res.status(404).json({ message: "Categoria no encontrado" });
-        }
-        if (categoria.estado) {
-            return res.status(400).json({ message: "El categoria ya está habilitada" });
-        }
-        categoria.estado = true;
-        await categoria.save();
-
-        const categoriaHabilitada = {
-            _id: categoria._id,
-            nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-            fechaCreacion: formatDatePeru(categoria.createdAt),
-            estado: categoria.estado   
-        };
-        
-        return success(res, { message: "Categoria habilitada", data: categoriaHabilitada });
-    } catch (error) {
-        return handleError(res, error, { message: "Error al habilitar categoria" });
+        return responderError(res, error, "Error al cambiar estado de categoria");
     }
 };
 
@@ -267,7 +279,6 @@ module.exports = {
     buscarCategoria,
     listarCategoria,
     editarCategoria,
-    deshabilitarCategoria,
-    obtenerCategoriasInactivas,
-    habilitarCategoria
+    cambiarEstadoCategoria,
+    obtenerCategoriasInactivas
 };

@@ -5,8 +5,6 @@ const {
 
 } = require('../controllers/service.controller');
 
-const { verificarToken } = require('../middlewares/auth.middleware');
-
 const router = express.Router();
 
 router.get('/ruc/:ruc', verificarRuc);

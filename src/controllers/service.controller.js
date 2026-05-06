@@ -27,9 +27,9 @@ const verificarRuc = async (req, res) => {
             return res.status(404).json({ success: false, message: 'RUC no encontrado o inválido' });
         }
     } catch (error) {
-        return handleError(res, error, {
-            statusCode: 502,
-            message: "Error al consultar el proveedor externo RUC",
+        return res.status(502).json({
+            success: false,
+            message: "Error al consultar el proveedor externo RUC"
         });
     }
 };
@@ -70,9 +70,9 @@ const verificarDNI = async (req, res) => {
             return res.status(404).json({ success: false, message: 'DNI no encontrado o inválido' });
         }
     } catch (error) {
-        return handleError(res, error, {
-            statusCode: 502,
-            message: "Error al consultar el proveedor externo DNI",
+        return res.status(502).json({
+            success: false,
+            message: "Error al consultar el proveedor externo DNI"
         });
     }
 };
