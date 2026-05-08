@@ -2,7 +2,10 @@ const express = require('express');
 const {
     registrarMetodoPago,
     listarMetodoPago,
-    obtenerMetodoPago    
+    obtenerMetodoPago,
+    buscarMetodoPago,
+    editarMetodoPago,
+    cambiarEstadoMetodoPago
 } = require('../controllers/payment.controller');
 
 const { verificarToken } = require('../middlewares/auth.middleware');
@@ -14,5 +17,8 @@ router.use(verificarToken);
 router.post('/', registrarMetodoPago);
 router.get('/', listarMetodoPago);
 router.get('/activos', obtenerMetodoPago);
+router.get('/:id', buscarMetodoPago);
+router.put('/:id', editarMetodoPago);
+router.patch('/:id/estado', cambiarEstadoMetodoPago);
 
 module.exports = router;

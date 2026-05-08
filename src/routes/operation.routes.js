@@ -1,12 +1,15 @@
-const express = require('express');
+const express = require("express");
 const {
     registrarOperacion,
-} = require('../controllers/operation.controller');
-
-const { verificarToken } = require('../middlewares/auth.middleware');
+    listarOperaciones
+} = require("../controllers/operation.controller");
+const { verificarToken } = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
-router.post('/registrar', verificarToken, registrarOperacion);
+router.use(verificarToken);
+
+router.post("/", registrarOperacion);
+router.get("/", listarOperaciones);
 
 module.exports = router;

@@ -1,15 +1,4 @@
-const mongoose = require("mongoose");
-const LoteProducto = require("../models/batch.model");
-const Producto = require("../models/product.model");
-const Tienda = require("../models/store.model");
-const { handleError } = require('../utils/handleError');
-const { success } = require("../utils/handleResponse");
-
-const obtenerTienda = async (idTienda) => {
-    const tienda = await Tienda.findById(idTienda);
-    if (!tienda) throw { status: 404, message: "Tienda no encontrada" };
-    return tienda;
-};
+const { query } = require("../config/database");
 
 const ESTADOS_INVENTARIO = {
     AGOTADO: 1,
@@ -21,650 +10,423 @@ const ESTADOS_INVENTARIO = {
 
 const LABELS_ESTADO = {
     1: "Agotado",
-    2: "Próximo a Vencer",
+    2: "Proximo a Vencer",
     3: "Stock Bajo",
     4: "Excedente",
-    5: "Stock Óptimo"
+    5: "Stock Optimo"
 };
-//nuevo endpoints filtro de busqueda por categoria, nombre producto, estado lote.
+
+const normalizarTexto = (valor) => typeof valor === "string" ? valor.trim() : "";
+const convertirNumero = (valor, fallback = null) => {
+    if (valor === null || valor === undefined || valor === "") return fallback;
+
+    const numero = Number(valor);
+    return Number.isFinite(numero) ? numero : fallback;
+};
+const convertirBooleanoQuery = (valor) => {
+    if (valor === undefined || valor === null || valor === "") return null;
+    if (valor === "true" || valor === true) return true;
+    if (valor === "false" || valor === false) return false;
+    return null;
+};
+const decimal = (valor) => valor === null || valor === undefined ? null : Number(valor);
+
+const validarId = (id, res, entidad = "producto") => {
+    const numero = Number(id);
+
+    if (!Number.isInteger(numero) || numero <= 0) {
+        res.status(400).json({
+            success: false,
+            message: `ID de ${entidad} invalido`
+        });
+        return null;
+    }
+
+    return numero;
+};
+
+const validarTienda = (req, res) => {
+    if (!req.idTienda) {
+        res.status(403).json({
+            success: false,
+            message: "Usuario sin tienda asociada"
+        });
+        return false;
+    }
+
+    return true;
+};
+
+const obtenerConfiguracionTienda = async (tiendaId) => {
+    const result = await query(
+        `SELECT stock_minimo, dias_alerta_vencimiento
+         FROM tiendas
+         WHERE id = $1 AND estado = TRUE
+         LIMIT 1`,
+        [tiendaId]
+    );
+
+    return result.rows[0] || null;
+};
+
+const formatearProductoInventario = (producto) => ({
+    id: producto.id,
+    nombre: producto.nombre,
+    imagenUrl: producto.imagen_url || null,
+    cantidadMedida: decimal(producto.cantidad_medida),
+    medida: producto.medida,
+    stockTotal: decimal(producto.stock_total) || 0,
+    totalLotes: Number(producto.total_lotes) || 0,
+    proximaFechaVencimiento: producto.proxima_fecha_vencimiento,
+    estadoInventario: producto.estado_inventario,
+    estadoInventarioTexto: LABELS_ESTADO[producto.estado_inventario],
+    categoria: {
+        id: producto.categoria_id,
+        nombre: producto.categoria_nombre
+    }
+});
+
+const formatearLote = (lote) => ({
+    id: lote.id,
+    numeroLote: `Lote #${lote.numero_lote}`,
+    stockInicial: decimal(lote.stock_inicial),
+    stockActual: decimal(lote.stock_actual),
+    precioCompra: decimal(lote.precio_compra),
+    fechaIngreso: lote.fecha_ingreso,
+    fechaVencimiento: lote.fecha_vencimiento,
+    estadoLote: lote.estado_lote
+});
+
+const construirCteInventario = () => `
+    WITH inventario AS (
+        SELECT
+            p.id,
+            p.nombre,
+            p.imagen_url,
+            p.cantidad_medida,
+            p.medida,
+            p.precio_venta,
+            p.cod_barras,
+            p.cod_interno,
+            p.perecible,
+            p.categoria_id,
+            c.nombre AS categoria_nombre,
+            p.fecha_registro,
+            COALESCE(SUM(l.stock_actual) FILTER (WHERE l.estado = TRUE), 0) AS stock_total,
+            COUNT(l.id) FILTER (WHERE l.estado = TRUE) AS total_lotes,
+            MIN(l.fecha_vencimiento) FILTER (
+                WHERE l.estado = TRUE
+                  AND l.fecha_vencimiento IS NOT NULL
+                  AND l.stock_actual > 0
+            ) AS proxima_fecha_vencimiento,
+            COUNT(l.id) FILTER (
+                WHERE l.estado = TRUE
+                  AND l.stock_actual > 0
+                  AND l.fecha_vencimiento IS NOT NULL
+                  AND l.fecha_vencimiento::date BETWEEN CURRENT_DATE AND (CURRENT_DATE + ($2::INT * INTERVAL '1 day'))::date
+            ) AS lotes_proximos_vencer
+        FROM productos p
+        INNER JOIN categorias c ON c.id = p.categoria_id
+        LEFT JOIN lotes_producto l ON l.producto_id = p.id
+        WHERE p.tienda_id = $1
+          AND p.estado = TRUE
+        GROUP BY p.id, c.nombre
+    ),
+    inventario_estado AS (
+        SELECT
+            *,
+            CASE
+                WHEN stock_total <= 0 THEN 1
+                WHEN lotes_proximos_vencer > 0 THEN 2
+                WHEN stock_total <= $3 THEN 3
+                WHEN stock_total > ($3 * 2) THEN 4
+                ELSE 5
+            END AS estado_inventario
+        FROM inventario
+    )
+`;
 
 const obtenerInventarioProductos = async (req, res) => {
     try {
-        const tienda = await obtenerTienda(req.idTienda);
-        const { idcategoria, nombreProducto, estado, perecible, pagina, limite } = req.query;
+        if (!validarTienda(req, res)) return;
 
-        // Paginacion
-        const paginaNum = parseInt(pagina) || 1;
-        const limiteNum = parseInt(limite) || 10;
-        const skip = (paginaNum - 1) * limiteNum;
-
-        // Validar estado
-        const estadoNum = estado && estado.trim() !== "" ? parseInt(estado) : null;
-        if (estadoNum !== null && (isNaN(estadoNum) || estadoNum < 1 || estadoNum > 5)) {
-            return res.status(400).json({ success: false, message: "Estado inválido. Los valores permitidos son del 1 al 5" });
+        const tienda = await obtenerConfiguracionTienda(req.idTienda);
+        if (!tienda) {
+            return res.status(404).json({
+                success: false,
+                message: "Tienda no encontrada"
+            });
         }
 
-        const hoy = new Date();
-        const fechaLimiteVencer = new Date();
-        fechaLimiteVencer.setDate(hoy.getDate() + tienda.diasAlertaVencimiento);
-        const stockMinimo = tienda.stockminimo;
+        const categoriaId = convertirNumero(req.query.idcategoria ?? req.query.categoriaId, null);
+        const nombreProducto = normalizarTexto(req.query.nombreProducto ?? req.query.query);
+        const estado = convertirNumero(req.query.estado, null);
+        const perecible = convertirBooleanoQuery(req.query.perecible);
+        const pagina = Math.max(1, convertirNumero(req.query.pagina, 1));
+        const limite = Math.min(50, Math.max(1, convertirNumero(req.query.limite, 10)));
+        const offset = (pagina - 1) * limite;
 
-        // Filtros base
-        const matchProducto = { Tienda: tienda._id, estado: true };
-
-        if (idcategoria && idcategoria.trim() !== "") {
-            matchProducto.Categoria = new mongoose.Types.ObjectId(idcategoria.trim());
-        }
-        if (nombreProducto && nombreProducto.trim() !== "") {
-            matchProducto.$text = { $search: nombreProducto.trim() };
-        }
-        if (perecible !== undefined && perecible.trim() !== "") {
-            matchProducto.perecible = perecible === "true";
+        if (estado !== null && !Object.values(ESTADOS_INVENTARIO).includes(estado)) {
+            return res.status(400).json({
+                success: false,
+                message: "Estado invalido. Los valores permitidos son del 1 al 5"
+            });
         }
 
-        // Etapas compartidas del pipeline
-        const etapasBase = [
-            { $match: matchProducto },
+        const filtros = [];
+        const valoresBase = [req.idTienda, tienda.dias_alerta_vencimiento, tienda.stock_minimo];
 
-            // Lotes activos del producto
-            {
-                $lookup: {
-                    from: "loteproductos",
-                    let: { productoId: "$_id" },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        { $eq: ["$Producto", "$$productoId"] },
-                                        { $eq: ["$estado", true] }
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            $project: {
-                                stockActual: 1,
-                                fechaVencimiento: 1
-                            }
-                        }
-                    ],
-                    as: "lotes"
-                }
-            },
+        if (categoriaId) {
+            valoresBase.push(categoriaId);
+            filtros.push(`categoria_id = $${valoresBase.length}`);
+        }
 
-            // Nombre de la categoria
-            {
-                $lookup: {
-                    from: "categorias",
-                    localField: "Categoria",
-                    foreignField: "_id",
-                    as: "categoriaInfo"
-                }
-            },
+        if (nombreProducto) {
+            valoresBase.push(`%${nombreProducto}%`);
+            filtros.push(`nombre ILIKE $${valoresBase.length}`);
+        }
 
-            // Calcular valores derivados de los lotes
-            {
-                $addFields: {
-                    _stockCalculado: { $sum: "$lotes.stockActual" },
+        if (perecible !== null) {
+            valoresBase.push(perecible);
+            filtros.push(`perecible = $${valoresBase.length}`);
+        }
 
-                    totalLotes: { $size: "$lotes" },
+        if (estado !== null) {
+            valoresBase.push(estado);
+            filtros.push(`estado_inventario = $${valoresBase.length}`);
+        }
 
-                    proximaFechaVencimiento: {
-                        $min: {
-                            $filter: {
-                                input: "$lotes.fechaVencimiento",
-                                as: "f",
-                                cond: { $ne: ["$$f", null] }
-                            }
-                        }
-                    },
+        const whereFinal = filtros.length ? `WHERE ${filtros.join(" AND ")}` : "";
 
-                    _lotesProximosAVencer: {
-                        $size: {
-                            $filter: {
-                                input: "$lotes",
-                                as: "l",
-                                cond: {
-                                    $and: [
-                                        { $ne: ["$$l.fechaVencimiento", null] },
-                                        { $lte: ["$$l.fechaVencimiento", fechaLimiteVencer] },
-                                        { $gte: ["$$l.fechaVencimiento", hoy] }
-                                    ]
-                                }
-                            }
-                        }
-                    },
+        const totalResult = await query(
+            `${construirCteInventario()}
+             SELECT COUNT(*)::INT AS total
+             FROM inventario_estado
+             ${whereFinal}`,
+            valoresBase
+        );
 
-                    categoria: { $arrayElemAt: ["$categoriaInfo", 0] }
-                }
-            },
+        const valoresListado = [...valoresBase, limite, offset];
+        const result = await query(
+            `${construirCteInventario()}
+             SELECT *
+             FROM inventario_estado
+             ${whereFinal}
+             ORDER BY estado_inventario ASC, fecha_registro DESC
+             LIMIT $${valoresListado.length - 1}
+             OFFSET $${valoresListado.length}`,
+            valoresListado
+        );
 
-            // Calcular estadoInventario
-            {
-                $addFields: {
-                    estadoInventario: {
-                        $switch: {
-                            branches: [
-                                {
-                                    case: { $lte: ["$_stockCalculado", 0] },
-                                    then: ESTADOS_INVENTARIO.AGOTADO
-                                },
-                                {
-                                    case: { $gt: ["$_lotesProximosAVencer", 0] },
-                                    then: ESTADOS_INVENTARIO.PROXIMO_A_VENCER
-                                },
-                                {
-                                    case: { $lte: ["$_stockCalculado", stockMinimo] },
-                                    then: ESTADOS_INVENTARIO.STOCK_BAJO
-                                },
-                                {
-                                    case: { $gt: ["$_stockCalculado", stockMinimo * 2] },
-                                    then: ESTADOS_INVENTARIO.EXCEDENTE
-                                }
-                            ],
-                            default: ESTADOS_INVENTARIO.STOCK_OPTIMO
-                        }
-                    }
-                }
-            },
+        const total = totalResult.rows[0]?.total || 0;
 
-            // Filtrar por estadoInventario si viene en el query
-            ...(estadoNum !== null ? [{ $match: { estadoInventario: estadoNum } }] : []),
-        ];
-
-        const projectFinal = {
-            $project: {
-                nombre: 1,
-                imagen: 1,
-                cantidadmedida: 1,
-                medida: 1,
-                stockTotal: "$_stockCalculado",
-                totalLotes: 1,
-                proximaFechaVencimiento: 1,
-                estadoInventario: 1,
-                categoria: {
-                    _id: "$categoria._id",
-                    nombre: "$categoria.nombre"
-                }
-            }
-        };
-
-        const pipeline = [
-            ...etapasBase,
-            {
-                $facet: {
-                    // Total real para calcular páginas
-                    total: [{ $count: "count" }],
-
-                    // Productos paginados y ordenados
-                    productos: [
-                        { $sort: { estadoInventario: 1, createdAt: -1 } },
-                        { $skip: skip },
-                        { $limit: limiteNum },
-                        projectFinal
-                    ]
-                }
-            }
-        ];
-
-        const [resultado] = await Producto.aggregate(pipeline);
-
-        const totalProductos = resultado.total[0]?.count || 0;
-
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
-            message: "Productos encontrados",
-            data: resultado.productos,
-            pagination: {
-                total: totalProductos,
-                pagina: paginaNum,
-                limite: limiteNum,
-                totalPaginas: Math.ceil(totalProductos / limiteNum)
+            message: result.rows.length ? "Productos encontrados" : "No se encontraron productos",
+            data: {
+                productos: result.rows.map(formatearProductoInventario),
+                paginacion: {
+                    total,
+                    pagina,
+                    limite,
+                    totalPaginas: Math.ceil(total / limite)
+                }
             }
         });
-
     } catch (error) {
-        const status = error.status || 500;
-        res.status(status).json({ success: false, message: error.message || "Error al filtrar productos" });
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Error al filtrar productos"
+        });
     }
 };
 
 const obtenerDetalleProducto = async (req, res) => {
     try {
-        const tienda = await obtenerTienda(req.idTienda);
-        const { id } = req.params;
+        if (!validarTienda(req, res)) return;
 
-        // Filtros de lotes
-        const { estadoLote, fechaDesde, fechaHasta } = req.query;
+        const id = validarId(req.params.id, res);
+        if (!id) return;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: "ID de producto inválido" });
+        const tienda = await obtenerConfiguracionTienda(req.idTienda);
+        if (!tienda) {
+            return res.status(404).json({
+                success: false,
+                message: "Tienda no encontrada"
+            });
         }
 
-        const hoy = new Date();
-        const fechaLimiteVencer = new Date();
-        fechaLimiteVencer.setDate(hoy.getDate() + tienda.diasAlertaVencimiento);
+        const estadoLote = normalizarTexto(req.query.estadoLote);
+        const fechaDesde = normalizarTexto(req.query.fechaDesde);
+        const fechaHasta = normalizarTexto(req.query.fechaHasta);
 
-        // Filtro de lotes según query params
-        const filtroPorFecha = [];
-        if (fechaDesde && fechaDesde.trim() !== "") {
-            filtroPorFecha.push({ $gte: ["$$l.fechaVencimiento", new Date(fechaDesde)] });
-        }
-        if (fechaHasta && fechaHasta.trim() !== "") {
-            filtroPorFecha.push({ $lte: ["$$l.fechaVencimiento", new Date(fechaHasta)] });
-        }
+        const productoResult = await query(
+            `${construirCteInventario()}
+             SELECT *
+             FROM inventario_estado
+             WHERE id = $4
+             LIMIT 1`,
+            [req.idTienda, tienda.dias_alerta_vencimiento, tienda.stock_minimo, id]
+        );
 
-        const pipeline = [
-            {
-                $match: {
-                    _id: new mongoose.Types.ObjectId(id),
-                    Tienda: tienda._id,
-                    estado: true
-                }
-            },
-
-            // Categoria
-            {
-                $lookup: {
-                    from: "categorias",
-                    localField: "Categoria",
-                    foreignField: "_id",
-                    as: "categoriaInfo"
-                }
-            },
-
-            // Todos los lotes activos
-            {
-                $lookup: {
-                    from: "loteproductos",
-                    let: { productoId: "$_id" },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        { $eq: ["$Producto", "$$productoId"] },
-                                        { $eq: ["$estado", true] }
-                                    ]
-                                }
-                            }
-                        }
-                    ],
-                    as: "lotesActivos"
-                }
-            },
-
-            // Lotes filtrados para la lista (con filtros de estado y fecha)
-            {
-                $lookup: {
-                    from: "loteproductos",
-                    let: { productoId: "$_id" },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        { $eq: ["$Producto", "$$productoId"] },
-                                        { $eq: ["$estado", true] },
-                                        // Filtro de fecha si viene
-                                        ...(filtroPorFecha.length > 0 ? filtroPorFecha.map(f => f) : []),
-                                    ]
-                                }
-                            }
-                        },
-                        { $sort: { createdAt: 1 } }
-                    ],
-                    as: "lotesFiltrados"
-                }
-            },
-
-            // Calcular resumen del producto desde lotesActivos
-            {
-                $addFields: {
-                    stockTotal: { $sum: "$lotesActivos.stockActual" },
-
-                    totalLotes: { $size: "$lotesActivos" },
-
-                    lotesProximosAVencer: {
-                        $size: {
-                            $filter: {
-                                input: "$lotesActivos",
-                                as: "l",
-                                cond: {
-                                    $and: [
-                                        { $ne: ["$$l.fechaVencimiento", null] },
-                                        { $lte: ["$$l.fechaVencimiento", fechaLimiteVencer] },
-                                        { $gte: ["$$l.fechaVencimiento", hoy] }
-                                    ]
-                                }
-                            }
-                        }
-                    },
-
-                    categoria: { $arrayElemAt: ["$categoriaInfo", 0] },
-
-                    // Agregar numero de lote a cada lote filtrado
-                    lotesFiltrados: {
-                        $map: {
-                            input: "$lotesFiltrados",
-                            as: "lote",
-                            in: {
-                                _id: "$$lote._id",
-                                numeroLote: {
-                                    $concat: [
-                                        "Lote #",
-                                        {
-                                            $toString: {
-                                                $add: [
-                                                    { $indexOfArray: ["$lotesActivos._id", "$$lote._id"] },
-                                                    1
-                                                ]
-                                            }
-                                        }
-                                    ]
-                                },
-                                stockInicial: "$$lote.stockInicial",
-                                stockActual: "$$lote.stockActual",
-                                precioCompra: "$$lote.precioCompra",
-                                fechaIngreso: "$$lote.fechaIngreso",
-                                fechaVencimiento: "$$lote.fechaVencimiento",
-                                estadoLote: {
-                                    $switch: {
-                                        branches: [
-                                            {
-                                                case: { $lte: ["$$lote.stockActual", 0] },
-                                                then: "Agotado"
-                                            },
-                                            {
-                                                case: {
-                                                    $and: [
-                                                        { $ne: ["$$lote.fechaVencimiento", null] },
-                                                        { $lte: ["$$lote.fechaVencimiento", fechaLimiteVencer] },
-                                                        { $gte: ["$$lote.fechaVencimiento", hoy] }
-                                                    ]
-                                                },
-                                                then: "Por vencer pronto"
-                                            }
-                                        ],
-                                        default: "En buen estado"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-
-            // Filtrar lotes por estadoLote si viene en query
-            ...(estadoLote && estadoLote.trim() !== "" ? [
-                {
-                    $addFields: {
-                        lotesFiltrados: {
-                            $filter: {
-                                input: "$lotesFiltrados",
-                                as: "l",
-                                cond: { $eq: ["$$l.estadoLote", estadoLote] }
-                            }
-                        }
-                    }
-                }
-            ] : []),
-
-            {
-                $project: {
-                    // Info principal del producto
-                    nombre: 1,
-                    imagen: 1,
-                    cantidadmedida: 1,
-                    medida: 1,
-                    precioVenta: 1,
-                    codigoBarras: 1,
-                    codigoInterno: 1,
-                    perecible: 1,
-
-                    // Resumen calculado
-                    stockTotal: 1,
-                    totalLotes: 1,
-                    lotesProximosAVencer: 1,
-
-                    // Categoria
-                    categoria: {
-                        _id: "$categoria._id",
-                        nombre: "$categoria.nombre"
-                    },
-
-                    // Lista de lotes
-                    lotes: "$lotesFiltrados"
-                }
-            }
-        ];
-
-        const [producto] = await Producto.aggregate(pipeline);
-
-        if (!producto) {
-            return res.status(404).json({ success: false, message: "Producto no encontrado" });
+        if (!productoResult.rows.length) {
+            return res.status(404).json({
+                success: false,
+                message: "Producto no encontrado"
+            });
         }
 
-        res.status(200).json({
+        const filtros = ["producto_id = $1", "estado = TRUE"];
+        const valores = [id];
+
+        if (fechaDesde) {
+            valores.push(fechaDesde);
+            filtros.push(`fecha_vencimiento::date >= $${valores.length}::date`);
+        }
+
+        if (fechaHasta) {
+            valores.push(fechaHasta);
+            filtros.push(`fecha_vencimiento::date <= $${valores.length}::date`);
+        }
+
+        const valoresLotes = [...valores, tienda.dias_alerta_vencimiento];
+        const lotesResult = await query(
+            `SELECT *
+             FROM (
+                SELECT
+                    id,
+                    ROW_NUMBER() OVER (ORDER BY fecha_ingreso ASC, id ASC) AS numero_lote,
+                    stock_inicial,
+                    stock_actual,
+                    precio_compra,
+                    fecha_ingreso,
+                    fecha_vencimiento,
+                    CASE
+                        WHEN stock_actual <= 0 THEN 'Agotado'
+                        WHEN fecha_vencimiento IS NOT NULL
+                         AND stock_actual > 0
+                         AND fecha_vencimiento::date BETWEEN CURRENT_DATE AND (CURRENT_DATE + ($${valoresLotes.length}::INT * INTERVAL '1 day'))::date
+                            THEN 'Por vencer pronto'
+                        ELSE 'En buen estado'
+                    END AS estado_lote
+                FROM lotes_producto
+                WHERE ${filtros.join(" AND ")}
+             ) lotes
+             ${estadoLote ? "WHERE estado_lote = $" + (valoresLotes.length + 1) : ""}
+             ORDER BY fecha_ingreso ASC, id ASC`,
+            estadoLote ? [...valoresLotes, estadoLote] : valoresLotes
+        );
+
+        const producto = productoResult.rows[0];
+
+        return res.status(200).json({
             success: true,
             message: "Producto encontrado",
-            data: producto
-        });
-
-    } catch (error) {
-        const status = error.status || 500;
-        res.status(status).json({ success: false, message: error.message || "Error al obtener detalle del producto" });
-    }
-};
-
-// =====================================================
-// 1. ESTADOS DISPONIBLES DEL LISTADO (todos los productos de la tienda)
-// =====================================================
-const obtenerEstadosDisponibles = async (req, res) => {
-    try {
-        const tienda = await obtenerTienda(req.idTienda);
-
-        const hoy = new Date();
-        const fechaLimiteVencer = new Date();
-        fechaLimiteVencer.setDate(hoy.getDate() + tienda.diasAlertaVencimiento);
-        const stockMinimo = tienda.stockminimo;
-
-        const pipeline = [
-            { $match: { Tienda: tienda._id, estado: true } },
-
-            {
-                $lookup: {
-                    from: "loteproductos",
-                    let: { productoId: "$_id" },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        { $eq: ["$Producto", "$$productoId"] },
-                                        { $eq: ["$estado", true] }
-                                    ]
-                                }
-                            }
-                        },
-                        { $project: { stockActual: 1, fechaVencimiento: 1 } }
-                    ],
-                    as: "lotes"
-                }
-            },
-
-            {
-                $addFields: {
-                    _stockCalculado: { $sum: "$lotes.stockActual" },
-                    _lotesProximosAVencer: {
-                        $size: {
-                            $filter: {
-                                input: "$lotes",
-                                as: "l",
-                                cond: {
-                                    $and: [
-                                        { $ne: ["$$l.fechaVencimiento", null] },
-                                        { $lte: ["$$l.fechaVencimiento", fechaLimiteVencer] },
-                                        { $gte: ["$$l.fechaVencimiento", hoy] }
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-
-            {
-                $addFields: {
-                    estadoInventario: {
-                        $switch: {
-                            branches: [
-                                {
-                                    case: { $lte: ["$_stockCalculado", 0] },
-                                    then: ESTADOS_INVENTARIO.AGOTADO
-                                },
-                                {
-                                    case: { $gt: ["$_lotesProximosAVencer", 0] },
-                                    then: ESTADOS_INVENTARIO.PROXIMO_A_VENCER
-                                },
-                                {
-                                    case: { $lte: ["$_stockCalculado", stockMinimo] },
-                                    then: ESTADOS_INVENTARIO.STOCK_BAJO
-                                },
-                                {
-                                    case: { $gt: ["$_stockCalculado", stockMinimo * 2] },
-                                    then: ESTADOS_INVENTARIO.EXCEDENTE
-                                }
-                            ],
-                            default: ESTADOS_INVENTARIO.STOCK_OPTIMO
-                        }
-                    }
-                }
-            },
-
-            { $group: { _id: "$estadoInventario" } }
-        ];
-
-        const resultado = await Producto.aggregate(pipeline);
-
-        const estados = resultado
-            .map(r => r._id)
-            .sort((a, b) => a - b)
-            .map(estado => ({
-                valor: estado,
-                label: LABELS_ESTADO[estado]
-            }));
-
-        res.status(200).json({
-            success: true,
-            message: "Estados disponibles",
-            data: estados
-        });
-
-    } catch (error) {
-        const status = error.status || 500;
-        res.status(status).json({ success: false, message: error.message || "Error al obtener estados disponibles" });
-    }
-};
-
-// =====================================================
-// 2. ESTADO ACTUAL DE UN PRODUCTO ESPECÍFICO
-// =====================================================
-const obtenerEstadoProducto = async (req, res) => {
-    try {
-        const tienda = await obtenerTienda(req.idTienda);
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ message: "ID de producto inválido" });
-        }
-
-        const hoy = new Date();
-        const fechaLimiteVencer = new Date();
-        fechaLimiteVencer.setDate(hoy.getDate() + tienda.diasAlertaVencimiento);
-
-        const pipeline = [
-            {
-                $match: {
-                    Producto: new mongoose.Types.ObjectId(id),
-                    estado: true
-                }
-            },
-
-            {
-                $addFields: {
-                    estadoLote: {
-                        $switch: {
-                            branches: [
-                                {
-                                    case: { $lte: ["$stockActual", 0] },
-                                    then: "Agotado"
-                                },
-                                {
-                                    case: {
-                                        $and: [
-                                            { $ne: ["$fechaVencimiento", null] },
-                                            { $lte: ["$fechaVencimiento", fechaLimiteVencer] },
-                                            { $gte: ["$fechaVencimiento", hoy] }
-                                        ]
-                                    },
-                                    then: "Por vencer pronto"
-                                }
-                            ],
-                            default: "En buen estado"
-                        }
-                    }
-                }
-            },
-
-            {
-                $group: {
-                    _id: "$estadoLote"
-                }
-            },
-
-            {
-                $addFields: {
-                    valor: {
-                        $switch: {
-                            branches: [
-                                { case: { $eq: ["$_id", "Agotado"] },          then: 1 },
-                                { case: { $eq: ["$_id", "Por vencer pronto"] }, then: 2 },
-                                { case: { $eq: ["$_id", "En buen estado"] },    then: 3 }
-                            ],
-                            default: 0
-                        }
-                    }
-                }
-            },
-
-            { $sort: { valor: 1 } },
-
-            {
-                $project: {
-                    _id: 0,
-                    valor: 1,
-                    label: "$_id"
+            data: {
+                producto: {
+                    ...formatearProductoInventario(producto),
+                    precioVenta: decimal(producto.precio_venta),
+                    codBarras: producto.cod_barras || null,
+                    codInterno: producto.cod_interno,
+                    perecible: producto.perecible,
+                    lotes: lotesResult.rows.map(formatearLote)
                 }
             }
-        ];
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Error al obtener detalle del producto"
+        });
+    }
+};
 
-        const estados = await LoteProducto.aggregate(pipeline);
+const obtenerEstadosDisponibles = async (req, res) => {
+    try {
+        if (!validarTienda(req, res)) return;
 
-        if (!estados.length) {
-            return res.status(404).json({ success: false, message: "No se encontraron lotes para este producto" });
+        const tienda = await obtenerConfiguracionTienda(req.idTienda);
+        if (!tienda) {
+            return res.status(404).json({
+                success: false,
+                message: "Tienda no encontrada"
+            });
         }
 
-        res.status(200).json({
-            success: true,
-            message: "Estados del producto",
-            data: estados
-        });
+        const result = await query(
+            `${construirCteInventario()}
+             SELECT DISTINCT estado_inventario
+             FROM inventario_estado
+             ORDER BY estado_inventario ASC`,
+            [req.idTienda, tienda.dias_alerta_vencimiento, tienda.stock_minimo]
+        );
 
+        return res.status(200).json({
+            success: true,
+            message: "Estados disponibles",
+            data: {
+                estados: result.rows.map((row) => ({
+                    valor: row.estado_inventario,
+                    label: LABELS_ESTADO[row.estado_inventario]
+                }))
+            }
+        });
     } catch (error) {
-        const status = error.status || 500;
-        res.status(status).json({ success: false, message: error.message || "Error al obtener estados del producto" });
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Error al obtener estados disponibles"
+        });
+    }
+};
+
+const obtenerEstadoProducto = async (req, res) => {
+    try {
+        if (!validarTienda(req, res)) return;
+
+        const id = validarId(req.params.id, res);
+        if (!id) return;
+
+        const tienda = await obtenerConfiguracionTienda(req.idTienda);
+        if (!tienda) {
+            return res.status(404).json({
+                success: false,
+                message: "Tienda no encontrada"
+            });
+        }
+
+        const result = await query(
+            `${construirCteInventario()}
+             SELECT id, estado_inventario
+             FROM inventario_estado
+             WHERE id = $4
+             LIMIT 1`,
+            [req.idTienda, tienda.dias_alerta_vencimiento, tienda.stock_minimo, id]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({
+                success: false,
+                message: "Producto no encontrado"
+            });
+        }
+
+        const estado = result.rows[0].estado_inventario;
+
+        return res.status(200).json({
+            success: true,
+            message: "Estado del producto obtenido correctamente",
+            data: {
+                estado: {
+                    valor: estado,
+                    label: LABELS_ESTADO[estado]
+                }
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Error al obtener estado del producto"
+        });
     }
 };
 

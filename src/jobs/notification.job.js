@@ -1,11 +1,8 @@
-const cron = require('node-cron');
-const Store = require('../models/store.model');
-const { notificarLotesCriticos } = require('../services/notification.service');
+const cron = require("node-cron");
+const { query } = require("../config/database");
+const { notificarLotesCriticos } = require("../services/notification.service");
 
-/**
- * Procesa tiendas en lotes para evitar sobrecargar el servidor
- */
-async function procesarTiendasEnLotes(tiendas, tamañoLote = 5) {
+const procesarTiendasEnLotes = async (tiendas, tamanioLote = 5) => {
     const resultados = {
         exitosas: 0,
         fallidas: 0,
@@ -13,81 +10,76 @@ async function procesarTiendasEnLotes(tiendas, tamañoLote = 5) {
         errores: []
     };
 
-    // Dividir tiendas en lotes
-    for (let i = 0; i < tiendas.length; i += tamañoLote) {
-        const lote = tiendas.slice(i, i + tamañoLote);
+    for (let i = 0; i < tiendas.length; i += tamanioLote) {
+        const loteTiendas = tiendas.slice(i, i + tamanioLote);
 
-        // Procesar tiendas del lote en paralelo
-        const promesas = lote.map(async (tienda) => {
+        const promesas = loteTiendas.map(async (tienda) => {
             try {
-                const resultado = await notificarLotesCriticos(tienda._id);
-                
-                const lotesCount = resultado.lotesNotificados?.length || 0;
-                
-                if (lotesCount > 0) {
-                    resultados.totalLotes += lotesCount;
-                }
-                
+                const resultado = await notificarLotesCriticos(tienda.id);
+                resultados.totalLotes += resultado.lotesNotificados?.length || 0;
                 resultados.exitosas++;
-                return { success: true, tienda: tienda._id };
             } catch (error) {
                 resultados.fallidas++;
                 resultados.errores.push({
-                    tiendaId: tienda._id,
-                    tiendaNombre: tienda.NombreTienda,
+                    tiendaId: tienda.id,
+                    tiendaNombre: tienda.nombre,
                     error: error.message
                 });
-                return { success: false, tienda: tienda._id, error: error.message };
             }
         });
 
         await Promise.allSettled(promesas);
 
-        // Pausa entre lotes
-        if (i + tamañoLote < tiendas.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        if (i + tamanioLote < tiendas.length) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
         }
     }
 
     return resultados;
-}
+};
 
-// Ejecutar todos los días a las 6:00 AM hora de Perú (UTC-5)
+const obtenerTiendasActivas = async () => {
+    const result = await query(
+        `SELECT id, nombre
+         FROM tiendas
+         WHERE estado = TRUE
+         ORDER BY id ASC`
+    );
+
+    return result.rows;
+};
+
 const iniciarCronNotificaciones = () => {
-    cron.schedule('0 6 * * *', async () => {
-        const horaInicio = new Date();
-        
-        console.log(`\n🔔 Notificaciones automáticas iniciadas - ${horaInicio.toLocaleString('es-PE', { timeZone: 'America/Lima' })}`);
-        
+    cron.schedule("0 6 * * *", async () => {
+        const inicio = Date.now();
+
         try {
-            const tiendas = await Store.find({ estado: true }).select('_id NombreTienda Usuario');
-            
-            if (tiendas.length === 0) {
-                console.log('No hay tiendas para procesar\n');
+            const tiendas = await obtenerTiendasActivas();
+
+            if (!tiendas.length) {
+                console.log("No hay tiendas activas para notificaciones");
                 return;
             }
 
             const resultados = await procesarTiendasEnLotes(tiendas, 5);
+            const duracionSegundos = Math.round((Date.now() - inicio) / 1000);
 
-            const duracion = Math.round((new Date() - horaInicio) / 1000);
+            console.log(
+                `Notificaciones completadas: ${resultados.exitosas}/${tiendas.length} tiendas, ${resultados.totalLotes} lotes, ${duracionSegundos}s`
+            );
 
-            console.log(`✅ Completado: ${resultados.exitosas}/${tiendas.length} tiendas | ${resultados.totalLotes} lotes notificados | ${duracion}s`);
-            
             if (resultados.fallidas > 0) {
-                console.log(`⚠️  ${resultados.fallidas} tiendas con errores`);
+                console.log(`Tiendas con error: ${resultados.fallidas}`);
             }
-
         } catch (error) {
-            console.error(`❌ Error crítico: ${error.message}`);
+            console.error(`Error en cron de notificaciones: ${error.message}`);
         }
-        
-        console.log(''); // Línea en blanco para separar
     }, {
-        timezone: 'America/Lima',
+        timezone: "America/Lima",
         scheduled: true
     });
 
-    console.log('✅ Cron configurado: Notificaciones diarias a las 6:00 AM (Hora Perú)');
+    console.log("Cron configurado: notificaciones diarias a las 6:00 AM");
 };
 
 module.exports = { iniciarCronNotificaciones };

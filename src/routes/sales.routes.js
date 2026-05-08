@@ -1,11 +1,19 @@
-const express = require('express');
+const express = require("express");
 const {
-    registrarVenta,      
-} = require('../controllers/sales.controller');
-const { verificarToken } = require('../middlewares/auth.middleware');
+    registrarVenta,
+    listarVentas,
+    buscarVenta,
+    cambiarEstadoVenta
+} = require("../controllers/sales.controller");
+const { verificarToken } = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
-router.post('/registrar',verificarToken, registrarVenta);
+router.use(verificarToken);
+
+router.post("/", registrarVenta);
+router.get("/", listarVentas);
+router.get("/:id", buscarVenta);
+router.patch("/:id/estado", cambiarEstadoVenta);
 
 module.exports = router;

@@ -9,8 +9,8 @@ const formatearCliente = (cliente) => ({
     apellido: cliente.apellido,
     telefono: cliente.telefono || "",
     estado: cliente.estado,
-    fechaRegistro: cliente.fecharegistro,
-    fechaModificacion: cliente.fechamodificacion
+    fechaRegistro: cliente.fecha_registro,
+    fechaModificacion: cliente.fecha_modificacion
 });
 
 const responderError = (res, error, mensaje) => {
@@ -72,7 +72,7 @@ const registrarCliente = async (req, res) => {
         const result = await query(
             `INSERT INTO clientes (tienda_id, documento, nombre, apellido, telefono)
              VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, documento, nombre, apellido, telefono, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion`,
             [req.idTienda, documento, nombre, apellido, telefono || null]
         );
 
@@ -91,10 +91,10 @@ const listarCliente = async (req, res) => {
         if (!validarTienda(req, res)) return;
 
         const result = await query(
-            `SELECT id, documento, nombre, apellido, telefono, estado, fechaRegistro, fechaModificacion
+            `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
              FROM clientes
              WHERE tienda_id = $1
-             ORDER BY fechaRegistro DESC
+             ORDER BY fecha_registro DESC
              LIMIT 50`,
             [req.idTienda]
         );
@@ -118,7 +118,7 @@ const obtenerCliente = async (req, res) => {
             if (!id) return;
 
             const result = await query(
-                `SELECT id, documento, nombre, apellido, telefono, estado, fechaRegistro, fechaModificacion
+                `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
                  FROM clientes
                  WHERE id = $1 AND tienda_id = $2
                  LIMIT 1`,
@@ -140,7 +140,7 @@ const obtenerCliente = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT id, documento, nombre, apellido, telefono, estado, fechaRegistro, fechaModificacion
+            `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
              FROM clientes
              WHERE tienda_id = $1 AND estado = TRUE
              ORDER BY nombre ASC, apellido ASC
@@ -186,7 +186,7 @@ const buscarPorDocumentoYNombre = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT id, documento, nombre, apellido, telefono, estado, fechaRegistro, fechaModificacion
+            `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
              FROM clientes
              WHERE ${filtros.join(" AND ")}
              ORDER BY nombre ASC, apellido ASC
@@ -246,9 +246,9 @@ const editarCliente = async (req, res) => {
              SET nombre = $1,
                  apellido = $2,
                  telefono = $3,
-                 fechaModificacion = NOW()
+                 fecha_modificacion = NOW()
              WHERE id = $4 AND tienda_id = $5
-             RETURNING id, documento, nombre, apellido, telefono, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion`,
             [nombreFinal, apellidoFinal, telefonoFinal || null, id, req.idTienda]
         );
 
@@ -303,9 +303,9 @@ const cambiarEstadoCliente = async (req, res) => {
         const result = await query(
             `UPDATE clientes
              SET estado = $1,
-                 fechaModificacion = NOW()
+                 fecha_modificacion = NOW()
              WHERE id = $2 AND tienda_id = $3
-             RETURNING id, documento, nombre, apellido, telefono, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion`,
             [estado, id, req.idTienda]
         );
 

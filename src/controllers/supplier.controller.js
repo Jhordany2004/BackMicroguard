@@ -10,8 +10,8 @@ const formatearProveedor = (proveedor) => ({
     razonSocial: proveedor.razon_social,
     telefono: proveedor.telefono || "",
     estado: proveedor.estado,
-    fechaRegistro: proveedor.fecharegistro,
-    fechaModificacion: proveedor.fechamodificacion
+    fechaRegistro: proveedor.fecha_registro,
+    fechaModificacion: proveedor.fecha_modificacion
 });
 
 const responderError = (res, error, mensaje) => {
@@ -93,7 +93,7 @@ const registrarProveedor = async (req, res) => {
         const result = await query(
             `INSERT INTO proveedores (tienda_id, tipo_proveedor, documento, razon_social, telefono)
              VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
             [req.idTienda, tipoProveedor, documento, razonSocial, telefono || null]
         );
 
@@ -112,10 +112,10 @@ const listarProveedores = async (req, res) => {
         if (!validarTienda(req, res)) return;
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE tienda_id = $1
-             ORDER BY fechaRegistro DESC
+             ORDER BY fecha_registro DESC
              LIMIT 50`,
             [req.idTienda]
         );
@@ -135,7 +135,7 @@ const obtenerProveedores = async (req, res) => {
         if (!validarTienda(req, res)) return;
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE tienda_id = $1 AND estado = TRUE
              ORDER BY razon_social ASC
@@ -161,7 +161,7 @@ const obtenerProveedorPorID = async (req, res) => {
         if (!id) return;
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE id = $1 AND tienda_id = $2
              LIMIT 1`,
@@ -213,7 +213,7 @@ const obtenerPorDocumentoYRazonSocial = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion
+            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE ${filtros.join(" AND ")}
              ORDER BY razon_social ASC
@@ -270,9 +270,9 @@ const editarProveedor = async (req, res) => {
             `UPDATE proveedores
              SET razon_social = $1,
                  telefono = $2,
-                 fechaModificacion = NOW()
+                 fecha_modificacion = NOW()
              WHERE id = $3 AND tienda_id = $4
-             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
             [razonSocialFinal, telefonoFinal || null, id, req.idTienda]
         );
 
@@ -327,9 +327,9 @@ const cambiarEstadoProveedor = async (req, res) => {
         const result = await query(
             `UPDATE proveedores
              SET estado = $1,
-                 fechaModificacion = NOW()
+                 fecha_modificacion = NOW()
              WHERE id = $2 AND tienda_id = $3
-             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
             [estado, id, req.idTienda]
         );
 

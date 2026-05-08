@@ -7,8 +7,8 @@ const formatearCategoria = (categoria) => ({
     nombre: categoria.nombre,
     descripcion: categoria.descripcion || "",
     estado: categoria.estado,
-    fechaRegistro: categoria.fecharegistro,
-    fechaModificacion: categoria.fechamodificacion
+    fechaRegistro: categoria.fecha_registro,
+    fechaModificacion: categoria.fecha_modificacion
 });
 
 const responderError = (res, error, mensaje) => {
@@ -61,7 +61,7 @@ const registrarCategoria = async (req, res) => {
         const result = await query(
             `INSERT INTO categorias (tienda_id, nombre, descripcion)
              VALUES ($1, $2, $3)
-             RETURNING id, nombre, descripcion, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, nombre, descripcion, estado, fecha_registro, fecha_modificacion`,
             [req.idTienda, nombre, descripcion || null]
         );
 
@@ -78,10 +78,10 @@ const registrarCategoria = async (req, res) => {
 const listarCategoria = async (req, res) => {
     try {
         const result = await query(
-            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+            `SELECT id, nombre, descripcion, estado, fecha_registro, fecha_modificacion
              FROM categorias
              WHERE tienda_id = $1
-             ORDER BY fechaRegistro DESC`,
+             ORDER BY fecha_registro DESC`,
             [req.idTienda]
         );
 
@@ -98,7 +98,7 @@ const listarCategoria = async (req, res) => {
 const obtenerCategoria = async (req, res) => {
     try {
         const result = await query(
-            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+            `SELECT id, nombre, descripcion, estado, fecha_registro, fecha_modificacion
              FROM categorias
              WHERE tienda_id = $1 AND estado = TRUE
              ORDER BY nombre ASC`,
@@ -118,7 +118,7 @@ const obtenerCategoria = async (req, res) => {
 const obtenerCategoriasInactivas = async (req, res) => {
     try {
         const result = await query(
-            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+            `SELECT id, nombre, descripcion, estado, fecha_registro, fecha_modificacion
              FROM categorias
              WHERE tienda_id = $1 AND estado = FALSE
              ORDER BY nombre ASC`,
@@ -141,7 +141,7 @@ const buscarCategoria = async (req, res) => {
         if (!id) return;
 
         const result = await query(
-            `SELECT id, nombre, descripcion, estado, fechaRegistro, fechaModificacion
+            `SELECT id, nombre, descripcion, estado, fecha_registro, fecha_modificacion
              FROM categorias
              WHERE id = $1 AND tienda_id = $2
              LIMIT 1`,
@@ -202,9 +202,9 @@ const editarCategoria = async (req, res) => {
             `UPDATE categorias
              SET nombre = $1,
                  descripcion = $2,
-                 fechaModificacion = NOW()
+                 fecha_modificacion = NOW()
              WHERE id = $3 AND tienda_id = $4
-             RETURNING id, nombre, descripcion, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, nombre, descripcion, estado, fecha_registro, fecha_modificacion`,
             [nombreFinal, descripcionFinal || null, id, req.idTienda]
         );
 
@@ -257,9 +257,9 @@ const cambiarEstadoCategoria = async (req, res) => {
         const result = await query(
             `UPDATE categorias
              SET estado = $1,
-                 fechaModificacion = NOW()
+                 fecha_modificacion = NOW()
              WHERE id = $2 AND tienda_id = $3
-             RETURNING id, nombre, descripcion, estado, fechaRegistro, fechaModificacion`,
+             RETURNING id, nombre, descripcion, estado, fecha_registro, fecha_modificacion`,
             [estado, id, req.idTienda]
         );
 
