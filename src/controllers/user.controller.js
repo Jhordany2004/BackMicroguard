@@ -305,59 +305,6 @@ const cerrarSesion = async (req, res) => {
     }
 };
 
-const recuperarContrasena = async (req, res) => {
-    try {
-        const correo = normalizarCorreo(req.body.correo || req.body.Correo);
-
-        if (!correo) {
-            return res.status(400).json({
-                success: false,
-                message: "El correo es obligatorio"
-            });
-        }
-
-        const usuario = await query(
-            "SELECT id FROM usuarios WHERE correo = $1 LIMIT 1",
-            [correo]
-        );
-
-        if (!usuario.rows.length) {
-            return res.status(404).json({
-                success: false,
-                message: "No existe un usuario con ese correo"
-            });
-        }
-
-        const link = await admin.auth().generatePasswordResetLink(correo);
-
-        await sendBrevoEmail({
-            to: correo,
-            subject: "Recuperacion de contrasena",
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2>Recuperacion de contrasena</h2>
-                    <p>Usa el siguiente enlace para restablecer tu contrasena:</p>
-                    <p><a href="${link}">Restablecer contrasena</a></p>
-                    <p>Si no solicitaste este cambio, puedes ignorar este correo.</p>
-                </div>
-            `
-        });
-
-        return res.status(200).json({
-            success: true,
-            message: "Correo de recuperacion enviado"
-        });
-    } catch (error) {
-        return responderError(res, error, "Error al enviar correo de recuperacion");
-    }
-};
-
-const restablecerContrasena = async (req, res) => {
-    return res.status(410).json({
-        success: false,
-        message: "El restablecimiento de contrasena ahora se gestiona con Firebase Auth"
-    });
-};
 
 const verificarRucDisponible = async (req, res) => {
     try {
