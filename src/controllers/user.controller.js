@@ -58,7 +58,7 @@ const verificarFirebaseToken = async (req) => {
 };
 
 const formatearUsuario = (usuario, tienda = null) => ({
-    id: usuario.id,
+    id: Number(usuario.id),
     firebaseUid: usuario.firebase_uid,
     nombres: usuario.nombres,
     apellidos: usuario.apellidos,
@@ -67,7 +67,7 @@ const formatearUsuario = (usuario, tienda = null) => ({
     rol: usuario.rol,
     estado: usuario.estado,
     tienda: tienda ? {
-        id: tienda.id,
+        id: Number(tienda.id),
         ruc: tienda.ruc,
         nombre: tienda.nombre,
         razonSocial: tienda.razon_social
@@ -355,8 +355,6 @@ const verificarRucDisponible = async (req, res) => {
 module.exports = {
     registrarUsuario,
     loginUsuario,
-    recuperarContrasena,
-    restablecerContrasena,
     cerrarSesion,
     verificarRucDisponible
 };
