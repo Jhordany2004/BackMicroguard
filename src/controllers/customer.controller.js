@@ -4,9 +4,14 @@ const normalizarTexto = (valor) => typeof valor === "string" ? valor.trim() : ""
 
 const formatearCliente = (cliente) => ({
     id: cliente.id,
+    tipoCliente: cliente.tipo_cliente,
+    tipoDocumento: cliente.tipo_documento,
     documento: cliente.documento,
-    nombre: cliente.nombre,
-    apellido: cliente.apellido,
+    nombres: cliente.nombres,
+    apellidos: cliente.apellidos,
+    nombre: cliente.nombres,
+    apellido: cliente.apellidos,
+    razonSocial: cliente.razon_social,
     telefono: cliente.telefono || "",
     estado: cliente.estado,
     fechaRegistro: cliente.fecha_registro,
@@ -53,27 +58,93 @@ const validarTienda = (req, res) => {
     return true;
 };
 
+const obtenerDatosCliente = (body, inferirTipo = false) => {
+    const razonSocial = normalizarTexto(body.razonSocial ?? body.razon_social);
+    const nombres = normalizarTexto(body.nombres ?? body.nombre);
+    const apellidos = normalizarTexto(body.apellidos ?? body.apellido);
+    const tipoClienteEnviado = normalizarTexto(body.tipoCliente ?? body.tipo_cliente);
+    const tipoCliente = tipoClienteEnviado || (inferirTipo ? (razonSocial ? "Empresa" : "Natural") : "");
+    const tipoDocumentoEnviado = normalizarTexto(body.tipoDocumento ?? body.tipo_documento).toUpperCase();
+    const tipoDocumento = tipoDocumentoEnviado || (inferirTipo && tipoCliente ? (tipoCliente === "Empresa" ? "RUC" : "DNI") : "");
+
+    return {
+        tipoCliente,
+        tipoDocumento: tipoCliente === "General" ? null : tipoDocumento || null,
+        documento: normalizarTexto(body.documento) || null,
+        nombres: nombres || null,
+        apellidos: apellidos || null,
+        razonSocial: razonSocial || null,
+        telefono: normalizarTexto(body.telefono) || null
+    };
+};
+
+const validarDatosCliente = (datos, res) => {
+    if (!["General", "Natural", "Empresa"].includes(datos.tipoCliente)) {
+        res.status(400).json({
+            success: false,
+            message: "Tipo de cliente invalido"
+        });
+        return false;
+    }
+
+    if (datos.tipoDocumento && !["DNI", "RUC"].includes(datos.tipoDocumento)) {
+        res.status(400).json({
+            success: false,
+            message: "Tipo de documento invalido"
+        });
+        return false;
+    }
+
+    if (datos.tipoCliente === "Natural" && !datos.nombres) {
+        res.status(400).json({
+            success: false,
+            message: "Los nombres son obligatorios para cliente natural"
+        });
+        return false;
+    }
+
+    if (datos.tipoCliente === "Empresa" && !datos.razonSocial) {
+        res.status(400).json({
+            success: false,
+            message: "La razon social es obligatoria para cliente empresa"
+        });
+        return false;
+    }
+
+    return true;
+};
+
 const registrarCliente = async (req, res) => {
     try {
         if (!validarTienda(req, res)) return;
 
-        const documento = normalizarTexto(req.body.documento);
-        const nombre = normalizarTexto(req.body.nombre);
-        const apellido = normalizarTexto(req.body.apellido);
-        const telefono = normalizarTexto(req.body.telefono);
+        const datos = obtenerDatosCliente(req.body, true);
 
-        if (!documento || !nombre || !apellido) {
-            return res.status(400).json({
-                success: false,
-                message: "Documento, nombre y apellido son obligatorios"
-            });
-        }
+        if (!validarDatosCliente(datos, res)) return;
 
         const result = await query(
-            `INSERT INTO clientes (tienda_id, documento, nombre, apellido, telefono)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion`,
-            [req.idTienda, documento, nombre, apellido, telefono || null]
+            `INSERT INTO clientes (
+                tienda_id,
+                tipo_cliente,
+                tipo_documento,
+                documento,
+                nombres,
+                apellidos,
+                razon_social,
+                telefono
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
+            [
+                req.idTienda,
+                datos.tipoCliente,
+                datos.tipoDocumento,
+                datos.documento,
+                datos.nombres,
+                datos.apellidos,
+                datos.razonSocial,
+                datos.telefono
+            ]
         );
 
         return res.status(201).json({
@@ -91,7 +162,7 @@ const listarCliente = async (req, res) => {
         if (!validarTienda(req, res)) return;
 
         const result = await query(
-            `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
+            `SELECT id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM clientes
              WHERE tienda_id = $1
              ORDER BY fecha_registro DESC
@@ -118,7 +189,7 @@ const obtenerCliente = async (req, res) => {
             if (!id) return;
 
             const result = await query(
-                `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
+                `SELECT id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono, estado, fecha_registro, fecha_modificacion
                  FROM clientes
                  WHERE id = $1 AND tienda_id = $2
                  LIMIT 1`,
@@ -140,10 +211,10 @@ const obtenerCliente = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
+            `SELECT id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM clientes
              WHERE tienda_id = $1 AND estado = TRUE
-             ORDER BY nombre ASC, apellido ASC
+             ORDER BY COALESCE(razon_social, nombres) ASC, apellidos ASC
              LIMIT 50`,
             [req.idTienda]
         );
@@ -182,14 +253,14 @@ const buscarPorDocumentoYNombre = async (req, res) => {
 
         if (nombre) {
             valores.push(`%${nombre}%`);
-            filtros.push(`nombre ILIKE $${valores.length}`);
+            filtros.push(`(nombres ILIKE $${valores.length} OR apellidos ILIKE $${valores.length} OR razon_social ILIKE $${valores.length})`);
         }
 
         const result = await query(
-            `SELECT id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion
+            `SELECT id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM clientes
              WHERE ${filtros.join(" AND ")}
-             ORDER BY nombre ASC, apellido ASC
+             ORDER BY COALESCE(razon_social, nombres) ASC, apellidos ASC
              LIMIT 50`,
             valores
         );
@@ -211,19 +282,30 @@ const editarCliente = async (req, res) => {
         const id = validarId(req.params.id, res);
         if (!id) return;
 
-        const nombre = normalizarTexto(req.body.nombre);
-        const apellido = normalizarTexto(req.body.apellido);
-        const telefono = normalizarTexto(req.body.telefono);
+        const datos = obtenerDatosCliente(req.body);
 
-        if (!nombre && !apellido && !telefono) {
+        if (
+            !req.body.tipoCliente &&
+            !req.body.tipo_cliente &&
+            !req.body.tipoDocumento &&
+            !req.body.tipo_documento &&
+            !req.body.documento &&
+            !req.body.nombres &&
+            !req.body.nombre &&
+            !req.body.apellidos &&
+            !req.body.apellido &&
+            !req.body.razonSocial &&
+            !req.body.razon_social &&
+            !req.body.telefono
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "Debe enviar nombre, apellido o telefono para actualizar"
+                message: "Debe enviar datos para actualizar"
             });
         }
 
         const actual = await query(
-            `SELECT id, nombre, apellido, telefono
+            `SELECT id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono
              FROM clientes
              WHERE id = $1 AND tienda_id = $2
              LIMIT 1`,
@@ -237,19 +319,49 @@ const editarCliente = async (req, res) => {
             });
         }
 
-        const nombreFinal = nombre || actual.rows[0].nombre;
-        const apellidoFinal = apellido || actual.rows[0].apellido;
-        const telefonoFinal = telefono || actual.rows[0].telefono;
+        const datosFinales = {
+            tipoCliente: datos.tipoCliente || actual.rows[0].tipo_cliente,
+            tipoDocumento: datos.tipoDocumento || actual.rows[0].tipo_documento,
+            documento: datos.documento || actual.rows[0].documento,
+            nombres: datos.nombres || actual.rows[0].nombres,
+            apellidos: datos.apellidos || actual.rows[0].apellidos,
+            razonSocial: datos.razonSocial || actual.rows[0].razon_social,
+            telefono: datos.telefono || actual.rows[0].telefono
+        };
+
+        if (datosFinales.tipoCliente === "General") {
+            datosFinales.tipoDocumento = null;
+            datosFinales.documento = null;
+            datosFinales.nombres = null;
+            datosFinales.apellidos = null;
+            datosFinales.razonSocial = null;
+        }
+
+        if (!validarDatosCliente(datosFinales, res)) return;
 
         const result = await query(
             `UPDATE clientes
-             SET nombre = $1,
-                 apellido = $2,
-                 telefono = $3,
+             SET tipo_cliente = $1,
+                 tipo_documento = $2,
+                 documento = $3,
+                 nombres = $4,
+                 apellidos = $5,
+                 razon_social = $6,
+                 telefono = $7,
                  fecha_modificacion = NOW()
-             WHERE id = $4 AND tienda_id = $5
-             RETURNING id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion`,
-            [nombreFinal, apellidoFinal, telefonoFinal || null, id, req.idTienda]
+             WHERE id = $8 AND tienda_id = $9
+             RETURNING id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
+            [
+                datosFinales.tipoCliente,
+                datosFinales.tipoDocumento,
+                datosFinales.documento,
+                datosFinales.nombres,
+                datosFinales.apellidos,
+                datosFinales.razonSocial,
+                datosFinales.telefono || null,
+                id,
+                req.idTienda
+            ]
         );
 
         return res.status(200).json({
@@ -305,7 +417,7 @@ const cambiarEstadoCliente = async (req, res) => {
              SET estado = $1,
                  fecha_modificacion = NOW()
              WHERE id = $2 AND tienda_id = $3
-             RETURNING id, documento, nombre, apellido, telefono, estado, fecha_registro, fecha_modificacion`,
+             RETURNING id, tipo_cliente, tipo_documento, documento, nombres, apellidos, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
             [estado, id, req.idTienda]
         );
 

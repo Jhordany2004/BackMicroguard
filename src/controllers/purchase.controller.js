@@ -90,7 +90,7 @@ const validarId = (id, res, entidad = "compra") => {
 };
 
 const validarTienda = (req, res) => {
-    if (!req.idTienda) {
+    if (!req.idTienda || !req.usuarioId) {
         res.status(403).json({
             success: false,
             message: "Usuario sin tienda asociada"
@@ -492,10 +492,10 @@ const registrarCompra = async (req, res) => {
         }
 
         const compraResult = await client.query(
-            `INSERT INTO compras (tienda_id, proveedor_id, precio_total)
-             VALUES ($1, $2, $3)
+            `INSERT INTO compras (tienda_id, proveedor_id, usuario_id, precio_total)
+             VALUES ($1, $2, $3, $4)
              RETURNING id`,
-            [req.idTienda, proveedor.id, precioTotalCompra]
+            [req.idTienda, proveedor.id, req.usuarioId, precioTotalCompra]
         );
 
         const compraId = compraResult.rows[0].id;

@@ -6,6 +6,7 @@ const normalizarMayusculas = (valor) => normalizarTexto(valor).toUpperCase();
 const formatearProveedor = (proveedor) => ({
     id: proveedor.id,
     tipoProveedor: proveedor.tipo_proveedor,
+    tipoDocumento: proveedor.tipo_documento,
     documento: proveedor.documento,
     razonSocial: proveedor.razon_social,
     telefono: proveedor.telefono || "",
@@ -54,9 +55,10 @@ const validarTienda = (req, res) => {
     return true;
 };
 
-const validarDocumento = (tipoProveedor, documento) => {
-    if (tipoProveedor === "Natural") return /^\d{8}$/.test(documento);
-    if (tipoProveedor === "Empresa") return /^\d{11}$/.test(documento);
+const validarDocumento = (tipoDocumento, documento) => {
+    if (tipoDocumento === "DNI") return /^\d{8}$/.test(documento);
+    if (tipoDocumento === "RUC") return /^\d{11}$/.test(documento);
+    if (tipoDocumento === "CE") return documento.length >= 8 && documento.length <= 20;
     return false;
 };
 
@@ -65,6 +67,7 @@ const registrarProveedor = async (req, res) => {
         if (!validarTienda(req, res)) return;
 
         const tipoProveedor = normalizarTexto(req.body.tipoProveedor);
+        const tipoDocumento = normalizarMayusculas(req.body.tipoDocumento ?? req.body.tipo_documento) || (tipoProveedor === "Natural" ? "DNI" : "RUC");
         const documento = normalizarTexto(req.body.documento);
         const razonSocial = normalizarMayusculas(req.body.razonSocial);
         const telefono = normalizarTexto(req.body.telefono);
@@ -83,18 +86,25 @@ const registrarProveedor = async (req, res) => {
             });
         }
 
-        if (!validarDocumento(tipoProveedor, documento)) {
+        if (!["DNI", "RUC", "CE"].includes(tipoDocumento)) {
             return res.status(400).json({
                 success: false,
-                message: "Documento no valido para el tipo de proveedor"
+                message: "Tipo de documento invalido"
+            });
+        }
+
+        if (!validarDocumento(tipoDocumento, documento)) {
+            return res.status(400).json({
+                success: false,
+                message: "Documento no valido para el tipo de documento"
             });
         }
 
         const result = await query(
-            `INSERT INTO proveedores (tienda_id, tipo_proveedor, documento, razon_social, telefono)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
-            [req.idTienda, tipoProveedor, documento, razonSocial, telefono || null]
+            `INSERT INTO proveedores (tienda_id, tipo_proveedor, tipo_documento, documento, razon_social, telefono)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, tipo_proveedor, tipo_documento, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
+            [req.idTienda, tipoProveedor, tipoDocumento, documento, razonSocial, telefono || null]
         );
 
         return res.status(201).json({
@@ -112,7 +122,7 @@ const listarProveedores = async (req, res) => {
         if (!validarTienda(req, res)) return;
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
+            `SELECT id, tipo_proveedor, tipo_documento, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE tienda_id = $1
              ORDER BY fecha_registro DESC
@@ -135,7 +145,7 @@ const obtenerProveedores = async (req, res) => {
         if (!validarTienda(req, res)) return;
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
+            `SELECT id, tipo_proveedor, tipo_documento, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE tienda_id = $1 AND estado = TRUE
              ORDER BY razon_social ASC
@@ -161,7 +171,7 @@ const obtenerProveedorPorID = async (req, res) => {
         if (!id) return;
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
+            `SELECT id, tipo_proveedor, tipo_documento, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE id = $1 AND tienda_id = $2
              LIMIT 1`,
@@ -213,7 +223,7 @@ const obtenerPorDocumentoYRazonSocial = async (req, res) => {
         }
 
         const result = await query(
-            `SELECT id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
+            `SELECT id, tipo_proveedor, tipo_documento, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion
              FROM proveedores
              WHERE ${filtros.join(" AND ")}
              ORDER BY razon_social ASC
@@ -272,7 +282,7 @@ const editarProveedor = async (req, res) => {
                  telefono = $2,
                  fecha_modificacion = NOW()
              WHERE id = $3 AND tienda_id = $4
-             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
+             RETURNING id, tipo_proveedor, tipo_documento, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
             [razonSocialFinal, telefonoFinal || null, id, req.idTienda]
         );
 
@@ -329,7 +339,7 @@ const cambiarEstadoProveedor = async (req, res) => {
              SET estado = $1,
                  fecha_modificacion = NOW()
              WHERE id = $2 AND tienda_id = $3
-             RETURNING id, tipo_proveedor, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
+             RETURNING id, tipo_proveedor, tipo_documento, documento, razon_social, telefono, estado, fecha_registro, fecha_modificacion`,
             [estado, id, req.idTienda]
         );
 

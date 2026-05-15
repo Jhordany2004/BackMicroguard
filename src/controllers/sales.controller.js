@@ -14,8 +14,11 @@ const formatearVenta = (venta) => ({
     cliente: venta.cliente_id
         ? {
             id: venta.cliente_id,
-            nombre: venta.cliente_nombre,
-            apellido: venta.cliente_apellido,
+            nombres: venta.cliente_nombres,
+            apellidos: venta.cliente_apellidos,
+            nombre: venta.cliente_nombres,
+            apellido: venta.cliente_apellidos,
+            razonSocial: venta.cliente_razon_social,
             documento: venta.cliente_documento
         }
         : null,
@@ -24,7 +27,9 @@ const formatearVenta = (venta) => ({
         nombre: venta.metodo_pago_nombre
     },
     precioTotal: decimal(venta.precio_total),
-    comprobante: venta.comprobante || null,
+    tipoComprobante: venta.tipo_comprobante,
+    serie: venta.serie,
+    correlativo: venta.correlativo,
     estado: venta.estado,
     fechaRegistro: venta.fecha_registro,
     fechaModificacion: venta.fecha_modificacion
@@ -35,9 +40,9 @@ const formatearDetalleVenta = (detalle) => ({
     loteId: detalle.lote_id,
     producto: {
         id: detalle.producto_id,
-        nombre: detalle.producto_nombre,
-        codInterno: detalle.cod_interno,
-        codBarras: detalle.cod_barras
+        nombre: detalle.prod_nombre,
+        medida: detalle.prod_medida,
+        codBarras: detalle.prod_cod_barras
     },
     cantidad: decimal(detalle.cantidad),
     precioUnitario: decimal(detalle.precio_unitario),
@@ -81,7 +86,7 @@ const validarId = (id, res, entidad = "venta") => {
 };
 
 const validarTienda = (req, res) => {
-    if (!req.idTienda) {
+    if (!req.idTienda || !req.usuarioId) {
         res.status(403).json({
             success: false,
             message: "Usuario sin tienda asociada"
@@ -96,7 +101,7 @@ const validarCliente = async (client, clienteId, tiendaId) => {
     if (!clienteId) return null;
 
     const result = await client.query(
-        `SELECT id, nombre, apellido, documento
+        `SELECT id, nombres, apellidos, razon_social, documento
          FROM clientes
          WHERE id = $1 AND tienda_id = $2 AND estado = TRUE
          LIMIT 1`,
@@ -125,8 +130,8 @@ const obtenerLoteParaVenta = async (client, loteId, tiendaId) => {
             l.producto_id,
             l.stock_actual,
             p.nombre AS producto_nombre,
-            p.cod_interno,
             p.cod_barras,
+            p.medida,
             p.precio_venta
          FROM lotes_producto l
          INNER JOIN productos p ON p.id = l.producto_id
@@ -147,13 +152,16 @@ const obtenerVentaConDetalles = async (ventaId, tiendaId) => {
         `SELECT
             v.id,
             v.cliente_id,
-            cl.nombre AS cliente_nombre,
-            cl.apellido AS cliente_apellido,
+            cl.nombres AS cliente_nombres,
+            cl.apellidos AS cliente_apellidos,
+            cl.razon_social AS cliente_razon_social,
             cl.documento AS cliente_documento,
             v.metodo_pago_id,
             mp.nombre AS metodo_pago_nombre,
             v.precio_total,
-            v.comprobante,
+            v.tipo_comprobante,
+            v.serie,
+            v.correlativo,
             v.estado,
             v.fecha_registro,
             v.fecha_modificacion
@@ -172,15 +180,14 @@ const obtenerVentaConDetalles = async (ventaId, tiendaId) => {
             dv.id,
             dv.lote_id,
             dv.producto_id,
-            p.nombre AS producto_nombre,
-            p.cod_interno,
-            p.cod_barras,
+            dv.prod_nombre,
+            dv.prod_medida,
+            dv.prod_cod_barras,
             dv.cantidad,
             dv.precio_unitario,
             dv.precio_total,
             dv.fecha_registro
          FROM detalle_ventas dv
-         INNER JOIN productos p ON p.id = dv.producto_id
          WHERE dv.venta_id = $1
          ORDER BY dv.id ASC`,
         [ventaId]
@@ -201,12 +208,21 @@ const registrarVenta = async (req, res) => {
         const clienteId = convertirNumero(req.body.clienteId ?? req.body.cliente_id ?? req.body.Cliente);
         const metodoPagoId = convertirNumero(req.body.metodoPagoId ?? req.body.metodo_pago_id ?? req.body.MetodoPago);
         const detalles = req.body.detalles;
-        const comprobante = normalizarTexto(req.body.comprobante);
+        const tipoComprobante = normalizarTexto(req.body.tipoComprobante ?? req.body.tipo_comprobante) || "Ticket";
+        const serie = normalizarTexto(req.body.serie) || null;
+        const correlativo = convertirNumero(req.body.correlativo);
 
         if (!metodoPagoId || !Array.isArray(detalles) || detalles.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: "Metodo de pago y detalles son obligatorios"
+            });
+        }
+
+        if (!["Ticket", "Boleta", "Factura", "Nota de venta"].includes(tipoComprobante)) {
+            return res.status(400).json({
+                success: false,
+                message: "Tipo de comprobante invalido"
             });
         }
 
@@ -289,17 +305,36 @@ const registrarVenta = async (req, res) => {
                 productoId: lote.producto_id,
                 cantidad,
                 precioUnitario,
-                precioTotal: precioTotalDetalle
+                precioTotal: precioTotalDetalle,
+                prodNombre: lote.producto_nombre,
+                prodMedida: lote.medida,
+                prodCodBarras: lote.cod_barras
             });
         }
 
-        const comprobanteFinal = metodoPago.nombre.toLowerCase() !== "efectivo" && comprobante ? comprobante : null;
-
         const ventaResult = await client.query(
-            `INSERT INTO ventas (tienda_id, cliente_id, metodo_pago_id, precio_total, comprobante)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO ventas (
+                tienda_id,
+                usuario_id,
+                cliente_id,
+                metodo_pago_id,
+                tipo_comprobante,
+                serie,
+                correlativo,
+                precio_total
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id`,
-            [req.idTienda, cliente?.id || null, metodoPago.id, precioTotalVenta, comprobanteFinal]
+            [
+                req.idTienda,
+                req.usuarioId,
+                cliente?.id || null,
+                metodoPago.id,
+                tipoComprobante,
+                serie,
+                correlativo,
+                precioTotalVenta
+            ]
         );
 
         const ventaId = ventaResult.rows[0].id;
@@ -312,16 +347,22 @@ const registrarVenta = async (req, res) => {
                     producto_id,
                     cantidad,
                     precio_unitario,
-                    precio_total
+                    precio_total,
+                    prod_nombre,
+                    prod_medida,
+                    prod_cod_barras
                  )
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
                 [
                     ventaId,
                     detalle.loteId,
                     detalle.productoId,
                     detalle.cantidad,
                     detalle.precioUnitario,
-                    detalle.precioTotal
+                    detalle.precioTotal,
+                    detalle.prodNombre,
+                    detalle.prodMedida,
+                    detalle.prodCodBarras
                 ]
             );
         }
@@ -351,13 +392,16 @@ const listarVentas = async (req, res) => {
             `SELECT
                 v.id,
                 v.cliente_id,
-                cl.nombre AS cliente_nombre,
-                cl.apellido AS cliente_apellido,
+                cl.nombres AS cliente_nombres,
+                cl.apellidos AS cliente_apellidos,
+                cl.razon_social AS cliente_razon_social,
                 cl.documento AS cliente_documento,
                 v.metodo_pago_id,
                 mp.nombre AS metodo_pago_nombre,
                 v.precio_total,
-                v.comprobante,
+                v.tipo_comprobante,
+                v.serie,
+                v.correlativo,
                 v.estado,
                 v.fecha_registro,
                 v.fecha_modificacion
