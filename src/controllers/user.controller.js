@@ -187,6 +187,20 @@ const registrarUsuario = async (req, res) => {
 
         const usuario = usuarioResult.rows[0];
 
+        await client.query(
+            `INSERT INTO clientes (
+                tienda_id,
+                tipo_cliente,
+                nombres
+            )
+            VALUES ($1, $2, $3)`,
+            [
+                tienda.id,
+                "General",
+                "Cliente General"
+            ]
+        );
+
         for (const metodo of metodosPagoIniciales) {
             await client.query(
                 `INSERT INTO metodos_pago (tienda_id, nombre, estado)
