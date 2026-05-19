@@ -11,19 +11,29 @@ const {
     cambiarEstadoProducto
 } = require("../controllers/product.controller");
 const { verificarToken } = require("../middlewares/auth.middleware");
+const { validateSchema } = require("../middlewares/validate.middleware");
+const {
+    idParamsSchema,
+    statusBodySchema,
+    createProductSchema,
+    productPayloadSchema,
+    suggestionsQuerySchema,
+    searchProductsQuerySchema,
+    codeParamsSchema
+} = require("../validators/product.validator");
 
 const router = express.Router();
 
 router.use(verificarToken);
 
-router.post("/", registrarProducto);
+router.post("/", validateSchema({ body: createProductSchema }), registrarProducto);
 router.get("/", listarProductos);
 router.get("/activos", listarProductosActivos);
-router.get("/sugerencias", obtenerSugerencias);
-router.get("/buscar", buscarProductos);
-router.get("/codigo/:codigo", obtenerProductoPorCodigo);
-router.get("/:id", buscarProductoPorId);
-router.put("/:id", editarProducto);
-router.patch("/:id/estado", cambiarEstadoProducto);
+router.get("/sugerencias", validateSchema({ query: suggestionsQuerySchema }), obtenerSugerencias);
+router.get("/buscar", validateSchema({ query: searchProductsQuerySchema }), buscarProductos);
+router.get("/codigo/:codigo", validateSchema({ params: codeParamsSchema }), obtenerProductoPorCodigo);
+router.get("/:id", validateSchema({ params: idParamsSchema }), buscarProductoPorId);
+router.put("/:id", validateSchema({ params: idParamsSchema, body: productPayloadSchema }), editarProducto);
+router.patch("/:id/estado", validateSchema({ params: idParamsSchema, body: statusBodySchema }), cambiarEstadoProducto);
 
 module.exports = router;

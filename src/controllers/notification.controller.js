@@ -1,32 +1,20 @@
 const { notificarLotesCriticos } = require("../services/notification.service");
+const { asyncHandler } = require("../utils/asyncHandler");
+const { success } = require("../utils/handleResponse");
+const { requireStore } = require("../utils/validators");
 
-const enviarNotificaciones = async (req, res) => {
-    try {
-        if (!req.idTienda) {
-            return res.status(403).json({
-                success: false,
-                message: "Usuario sin tienda asociada"
-            });
+const enviarNotificaciones = asyncHandler(async (req, res) => {
+    const resultado = await notificarLotesCriticos(requireStore(req));
+    const totalLotes = resultado.lotesNotificados.length;
+
+    return success(res, {
+        message: totalLotes ? "Notificaciones enviadas correctamente" : "No hay lotes criticos para notificar",
+        data: {
+            lotesNotificados: resultado.lotesNotificados,
+            totalLotes,
+            estadisticas: resultado.estadisticas
         }
-
-        const resultado = await notificarLotesCriticos(req.idTienda);
-        const totalLotes = resultado.lotesNotificados.length;
-
-        return res.status(200).json({
-            success: true,
-            message: totalLotes ? "Notificaciones enviadas correctamente" : "No hay lotes criticos para notificar",
-            data: {
-                lotesNotificados: resultado.lotesNotificados,
-                totalLotes,
-                estadisticas: resultado.estadisticas
-            }
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message || "Error al enviar notificaciones"
-        });
-    }
-};
+    });
+});
 
 module.exports = { enviarNotificaciones };

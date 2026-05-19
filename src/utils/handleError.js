@@ -54,7 +54,8 @@ const handleError = (res, error, options = {}) => {
     if (error?.statusCode && error?.message) {
         return res.status(error.statusCode).json({
             success: false,
-            message: error.message
+            message: error.message,
+            ...(error.details && { errors: error.details })
         });
     }
 

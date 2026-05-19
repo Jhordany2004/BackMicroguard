@@ -7,6 +7,7 @@ const app = express();
 
 const { connectDB } = require("./src/config/database");
 const { iniciarCronNotificaciones } = require("./src/jobs/notification.job");
+const { notFoundHandler, errorHandler } = require("./src/middlewares/error.middleware");
 
 app.use(cors());
 app.use(express.json());
@@ -36,6 +37,9 @@ app.use("/inventario", inventarioRoutes);
 app.use("/venta", ventaRoutes);
 app.use("/notificacion", notificationRoutes);
 app.use("/operacion", operationRoutes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 async function startServer() {
     try {
