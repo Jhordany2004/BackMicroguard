@@ -9,7 +9,7 @@ const VALID_REASONS = ["Error logistico", "Producto danado", "Traspaso", "Otro"]
 const decimal = (value) => (value === null || value === undefined ? null : Number(value));
 
 const formatOperation = (operation) => ({
-    id: operation.id,
+    id: Number(operation.id),
     razon: operation.razon,
     descripcion: operation.descripcion || null,
     cantidad: decimal(operation.cantidad),

@@ -4,7 +4,7 @@ const { normalizeText } = require("../utils/validators");
 const { mapPostgresError } = require("../utils/postgresError");
 
 const formatCategory = (category) => ({
-    id: category.id,
+    id: Number(category.id),
     nombre: category.nombre,
     descripcion: category.descripcion || "",
     estado: category.estado,

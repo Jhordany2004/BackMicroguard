@@ -9,10 +9,10 @@ const VALID_RECEIPT_TYPES = ["Ticket", "Boleta", "Factura", "Nota de venta"];
 const decimal = (value) => (value === null || value === undefined ? null : Number(value));
 
 const formatSale = (sale) => ({
-    id: sale.id,
+    id: Number(sale.id),
     cliente: sale.cliente_id
         ? {
-            id: sale.cliente_id,
+            id: Number(sale.cliente_id),
             nombres: sale.cliente_nombres,
             apellidos: sale.cliente_apellidos,
             nombre: sale.cliente_nombres,
@@ -22,7 +22,7 @@ const formatSale = (sale) => ({
         }
         : null,
     metodoPago: {
-        id: sale.metodo_pago_id,
+        id: Number(sale.metodo_pago_id),
         nombre: sale.metodo_pago_nombre
     },
     precioTotal: decimal(sale.precio_total),
@@ -35,10 +35,10 @@ const formatSale = (sale) => ({
 });
 
 const formatSaleDetail = (detail) => ({
-    id: detail.id,
-    loteId: detail.lote_id,
+    id: Number(detail.id),
+    loteId: Number(detail.lote_id),
     producto: {
-        id: detail.producto_id,
+        id: Number(detail.producto_id),
         nombre: detail.prod_nombre,
         medida: detail.prod_medida,
         codBarras: detail.prod_cod_barras

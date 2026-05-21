@@ -14,9 +14,9 @@ const decimal = (value) => (value === null || value === undefined ? null : Numbe
 const generateInternalCode = () => `INT-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
 
 const formatPurchase = (purchase) => ({
-    id: purchase.id,
+    id: Number(purchase.id),
     proveedor: {
-        id: purchase.proveedor_id,
+        id: Number(purchase.proveedor_id),
         razonSocial: purchase.proveedor_razon_social
     },
     precioTotal: decimal(purchase.precio_total),
@@ -26,10 +26,10 @@ const formatPurchase = (purchase) => ({
 });
 
 const formatPurchaseDetail = (detail) => ({
-    id: detail.id,
-    loteId: detail.lote_id,
+    id: Number(detail.id),
+    loteId: Number(detail.lote_id),
     producto: {
-        id: detail.producto_id,
+        id: Number(detail.producto_id),
         nombre: detail.prod_nombre,
         medida: detail.prod_medida,
         codBarras: detail.prod_cod_barras

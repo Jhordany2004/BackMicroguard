@@ -10,7 +10,7 @@ const ALLOWED_MEASURES = ["lt", "ml", "g", "kg", "kl"];
 const decimal = (value) => (value === null || value === undefined ? null : Number(value));
 
 const formatProduct = (product) => ({
-    id: product.id,
+    id: Number(product.id),
     nombre: product.nombre,
     codBarras: product.cod_barras || null,
     codInterno: product.cod_interno,

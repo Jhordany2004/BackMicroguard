@@ -4,7 +4,7 @@ const { normalizeText } = require("../utils/validators");
 const { mapPostgresError } = require("../utils/postgresError");
 
 const formatPaymentMethod = (method) => ({
-    id: method.id,
+    id: Number(method.id),
     nombre: method.nombre,
     estado: method.estado,
     fechaRegistro: method.fecha_registro,

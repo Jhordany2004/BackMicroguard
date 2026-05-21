@@ -28,7 +28,7 @@ const toQueryBoolean = (value) => {
 };
 
 const formatInventoryProduct = (product) => ({
-    id: product.id,
+    id: Number(product.id),
     nombre: product.nombre,
     imagenUrl: product.imagen_url || null,
     cantidadMedida: decimal(product.cantidad_medida),

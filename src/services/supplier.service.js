@@ -4,7 +4,7 @@ const { normalizeText, normalizeUpper } = require("../utils/validators");
 const { mapPostgresError } = require("../utils/postgresError");
 
 const formatSupplier = (supplier) => ({
-    id: supplier.id,
+    id: Number(supplier.id),
     tipoProveedor: supplier.tipo_proveedor,
     tipoDocumento: supplier.tipo_documento,
     documento: supplier.documento,

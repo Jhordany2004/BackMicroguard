@@ -4,7 +4,7 @@ const { normalizeText } = require("../utils/validators");
 const { mapPostgresError } = require("../utils/postgresError");
 
 const formatCustomer = (customer) => ({
-    id: customer.id,
+    id: Number(customer.id),
     tipoCliente: customer.tipo_cliente,
     tipoDocumento: customer.tipo_documento,
     documento: customer.documento,
