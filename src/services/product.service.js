@@ -22,7 +22,7 @@ const formatProduct = (product) => ({
     estado: product.estado,
     categoria: product.categoria_id
         ? {
-            id: product.categoria_id,
+            id: Number(product.categoria_id),
             nombre: product.categoria_nombre || null
         }
         : null,
@@ -158,13 +158,19 @@ const getSuggestions = async ({ tiendaId, query }) => {
     };
 };
 
-const searchProducts = async ({ tiendaId, query }) => {
+const searchProducts = async ({ tiendaId, query = {} }) => {
     const text = normalizeText(query.query);
     const categoriaId = toNumber(query.categoria, null);
     const limit = getLimit(query.limit, 10);
     const page = Math.max(1, toNumber(query.page, 1));
     const offset = (page - 1) * limit;
-    const { rows, total } = await productRepository.search({ tiendaId, text, categoriaId, limit, offset });
+    const { rows, total } = await productRepository.search({
+        tiendaId,
+        text: text || null,
+        categoriaId,
+        limit,
+        offset
+    });
 
     return {
         productos: rows.map(formatProduct),

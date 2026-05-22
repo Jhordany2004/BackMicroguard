@@ -1,5 +1,7 @@
 const { z, idParamsSchema, statusBodySchema, optionalNumeric } = require("./common.validator");
 
+const processEmptyToUndefined = (v) => (typeof v === 'string' && v.trim() === '') ? undefined : v;
+
 const productPayloadSchema = z.object({
     categoriaId: optionalNumeric,
     categoria_id: optionalNumeric,
@@ -34,7 +36,13 @@ const suggestionsQuerySchema = z.object({
 
 const searchProductsQuerySchema = z.object({
     query: z.string().trim().optional(),
-    categoria: optionalNumeric,
+    categoria: z.preprocess(
+        processEmptyToUndefined,
+        z.union([
+            z.string().regex(/^\d+$/, "Debe ser numerico"),
+            z.number().int("Debe ser entero")
+        ]).optional()
+    ),
     limit: optionalNumeric,
     page: optionalNumeric
 }).passthrough();
