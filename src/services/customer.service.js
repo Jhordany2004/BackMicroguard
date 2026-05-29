@@ -63,12 +63,36 @@ const validateCustomerData = (data) => {
         throw badRequest("Tipo de documento invalido");
     }
 
-    if (data.tipoCliente === "Natural" && !data.nombres) {
-        throw badRequest("Los nombres son obligatorios para cliente natural");
+    if (data.tipoCliente === "General") {
+        if (data.tipoDocumento || data.documento) {
+            throw badRequest("El cliente general no debe tener documento");
+        }
+
+        return;
     }
 
-    if (data.tipoCliente === "Empresa" && !data.razonSocial) {
-        throw badRequest("La razon social es obligatoria para cliente empresa");
+    if (!data.documento) {
+        throw badRequest("El documento es obligatorio");
+    }
+
+    if (data.tipoCliente === "Natural") {
+        if (data.tipoDocumento !== "DNI") {
+            throw badRequest("El cliente natural debe tener tipo de documento DNI");
+        }
+
+        if (!data.nombres) {
+            throw badRequest("Los nombres son obligatorios para cliente natural");
+        }
+    }
+
+    if (data.tipoCliente === "Empresa") {
+        if (data.tipoDocumento !== "RUC") {
+            throw badRequest("El cliente empresa debe tener tipo de documento RUC");
+        }
+
+        if (!data.razonSocial) {
+            throw badRequest("La razon social es obligatoria para cliente empresa");
+        }
     }
 };
 
@@ -86,7 +110,7 @@ const clearGeneralCustomerFields = (data) => {
 };
 
 const createCustomer = async ({ tiendaId, body }) => {
-    const data = buildCustomerData(body, true);
+    const data = clearGeneralCustomerFields(buildCustomerData(body, true));
     validateCustomerData(data);
 
     try {

@@ -23,14 +23,14 @@ const validateDocument = (tipoDocumento, documento) => {
 };
 
 const normalizeSupplierData = (body) => {
-    const tipoProveedor = normalizeText(body.tipoProveedor);
+    const tipoProveedor = normalizeText(body.tipoProveedor ?? body.tipo_proveedor);
     const tipoDocumento = normalizeUpper(body.tipoDocumento ?? body.tipo_documento) || (tipoProveedor === "Natural" ? "DNI" : "RUC");
 
     return {
         tipoProveedor,
         tipoDocumento,
         documento: normalizeText(body.documento),
-        razonSocial: normalizeUpper(body.razonSocial),
+        razonSocial: normalizeUpper(body.razonSocial ?? body.razon_social),
         telefono: normalizeText(body.telefono)
     };
 };
@@ -46,6 +46,14 @@ const validateSupplierData = (data) => {
 
     if (!["DNI", "RUC", "CE"].includes(data.tipoDocumento)) {
         throw badRequest("Tipo de documento invalido");
+    }
+
+    if (data.tipoProveedor === "Empresa" && data.tipoDocumento !== "RUC") {
+        throw badRequest("El proveedor empresa debe tener tipo de documento RUC");
+    }
+
+    if (data.tipoProveedor === "Natural" && !["DNI", "RUC", "CE"].includes(data.tipoDocumento)) {
+        throw badRequest("El proveedor natural debe tener tipo de documento DNI, RUC o CE");
     }
 
     if (!validateDocument(data.tipoDocumento, data.documento)) {
