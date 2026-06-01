@@ -1,210 +1,274 @@
-# MicroGuard Backend API
+# MicroGuard Backend
 
-Backend desarrollado para la plataforma **MicroGuard**, una aplicación orientada a la gestión, monitoreo y administración de procesos empresariales y operativos mediante una arquitectura escalable basada en APIs REST.
+API REST para **MicroGuard**, sistema orientado a la gestion de tiendas, inventario, compras, ventas, clientes, proveedores y notificaciones de stock o vencimiento.
 
-El proyecto fue desarrollado utilizando una arquitectura modular inspirada en patrones profesionales como MVC + Services + Repository Pattern, priorizando:
+El backend esta desarrollado con Node.js, Express y PostgreSQL. Usa Firebase Admin para validar usuarios autenticados desde Firebase, registra tokens FCM para notificaciones push y ejecuta una tarea programada diaria para alertar sobre lotes criticos.
 
-* Escalabilidad
-* Mantenibilidad
-* Seguridad
-* Separación de responsabilidades
-* Buenas prácticas backend
+## Tecnologias
 
----
-
-# Tecnologías Utilizadas
-
-## Backend
-
-* Node.js
-* Express.js
-* PostgreSQL
-* JWT Authentication
-* bcrypt
-* dotenv
+- Node.js
+- Express 5
+- PostgreSQL
+- Firebase Admin SDK
+- Firebase Cloud Messaging
+- Zod
+- dotenv
+- cors
+- node-cron
+- node-fetch
 
 ## Arquitectura
 
-* REST API
-* MVC Pattern
-* Service Layer
-* Repository Pattern
-* Middlewares
-* Validaciones
-
----
-
-# Características Principales
-
-* Autenticación mediante JWT
-* Manejo de roles y permisos
-* Arquitectura desacoplada
-* Conexión con PostgreSQL
-* Middlewares de seguridad
-* Validación de datos
-* Manejo centralizado de errores
-* API modular y escalable
-* Separación entre lógica de negocio y acceso a datos
-
----
-
-# Arquitectura del Proyecto
+El proyecto sigue una organizacion por capas para separar rutas, controladores, reglas de negocio, acceso a datos y validaciones.
 
 ```txt
-src/
-│
-├── config/
-│   └── database.js
-│
-├── controllers/
-│
-├── services/
-│
-├── repositories/
-│
-├── routes/
-│
-├── middlewares/
-│
-├── validators/
-│
-├── utils/
-│
-├── constants/
-│
-└── app.js
+Backend/
+|-- app.js
+|-- package.json
+|-- database/
+|   `-- schema.sql
+`-- src/
+    |-- config/
+    |-- controllers/
+    |-- jobs/
+    |-- middlewares/
+    |-- repositories/
+    |-- routes/
+    |-- services/
+    |-- utils/
+    `-- validators/
 ```
 
----
-
-# Flujo de la Arquitectura
+Flujo principal:
 
 ```txt
-Routes
-  ↓
-Controllers
-  ↓
-Services
-  ↓
-Repositories
-  ↓
-PostgreSQL
+Routes -> Middlewares -> Controllers -> Services -> Repositories -> PostgreSQL
 ```
 
----
+## Modulos Principales
 
-# Descripción de Capas
+- **Usuarios y tiendas**: registro inicial, login, cierre de sesion y validacion de RUC disponible.
+- **Categorias**: registro, listado, busqueda, edicion y cambio de estado.
+- **Clientes**: gestion de clientes generales, naturales y empresas.
+- **Proveedores**: gestion de proveedores naturales o empresas.
+- **Metodos de pago**: administracion de medios de pago por tienda.
+- **Productos**: registro, busqueda, sugerencias, codigos internos, codigos de barras y estado.
+- **Compras**: registro de compras y detalle de lotes ingresados.
+- **Ventas**: registro de ventas, detalle de productos vendidos y comprobantes.
+- **Inventario**: consulta de stock, lotes, estados y detalle por producto.
+- **Operaciones de inventario**: ajustes por error logistico, producto danado, traspaso u otros motivos.
+- **Notificaciones**: envio de alertas push y cron diario de lotes criticos.
+- **Servicios externos**: consulta de RUC y DNI.
 
-## Routes
+## Requisitos
 
-Definen los endpoints disponibles de la API.
+- Node.js 18 o superior recomendado.
+- PostgreSQL instalado o una base de datos PostgreSQL remota.
+- Proyecto de Firebase con credenciales de servicio.
+- Token para consulta de DNI en API Peru, si se usara el endpoint de DNI.
 
-## Controllers
+## Instalacion
 
-Gestionan las peticiones HTTP y las respuestas.
+```bash
+npm install
+```
 
-## Services
+## Configuracion
 
-Contienen la lógica de negocio principal.
+Crea un archivo `.env` en la raiz del proyecto. Puedes conectarte a PostgreSQL usando `DATABASE_URL` o variables separadas.
 
-## Repositories
+```env
+PORT=8080
+NODE_ENV=development
 
-Gestionan el acceso y consultas a la base de datos PostgreSQL.
+# Opcion 1: conexion completa
+DATABASE_URL=postgresql://usuario:password@localhost:5432/microguard
+PGSSL=false
 
-## Middlewares
+# Opcion 2: conexion por partes
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=microguard
+PGUSER=postgres
+PGPASSWORD=postgres
 
-Manejo de autenticación, validaciones y control de errores.
+# Firebase Admin
+FIREBASE_CREDENTIALS_PATH=./src/config/firebase-service-account.json
+# o FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
 
----
+# Consulta DNI
+API_KEY_DNI=tu_token
+```
 
-# Seguridad
+> Nota: `.env` y `src/config/firebase-service-account.json` estan ignorados por Git porque contienen informacion sensible.
 
-El backend implementa:
+## Base de Datos
 
-* Hash de contraseñas con bcrypt
-* Autenticación JWT
-* Variables de entorno con dotenv
-* Validación de peticiones
-* Middleware de autorización
+El esquema inicial esta en:
 
----
+```txt
+database/schema.sql
+```
 
-# Base de Datos
+Incluye las tablas principales:
 
-La aplicación utiliza PostgreSQL como sistema de gestión de base de datos relacional.
+- tiendas
+- usuarios
+- tokens_fcm
+- categorias
+- clientes
+- proveedores
+- metodos_pago
+- productos
+- lotes_producto
+- compras y detalle_compras
+- ventas y detalle_ventas
+- operaciones_inventario
 
-Se diseñó una estructura enfocada en:
+Para preparar la base de datos, crea una base PostgreSQL y ejecuta el contenido de `database/schema.sql`.
 
-* Escalabilidad
-* Relaciones normalizadas
-* Optimización de consultas
-* Integridad de datos
+## Ejecucion
 
----
+Modo desarrollo con recarga automatica de Node:
 
-# Endpoints Principales
+```bash
+npm run dev
+```
 
-## Auth
+Modo produccion:
+
+```bash
+npm start
+```
+
+Por defecto el servidor levanta en:
+
+```txt
+http://localhost:8080
+```
+
+## Scripts Disponibles
+
+```bash
+npm run dev
+npm start
+npm test
+```
+
+Actualmente `npm test` no tiene pruebas configuradas.
+
+## Endpoints Principales
+
+Rutas publicas:
 
 ```http
-POST /api/auth/login
-POST /api/auth/register
+POST /usuario/completarRegistro
+GET  /usuario/verificarRucDisponible
+POST /usuario/login
+GET  /servicio/ruc/:ruc
+GET  /servicio/dni/:dni
 ```
 
-## Usuarios
+Rutas protegidas con token Firebase en el header `Authorization: Bearer <token>`:
 
 ```http
-GET /api/users
-GET /api/users/:id
-POST /api/users
-PUT /api/users/:id
-DELETE /api/users/:id
+POST /usuario/cerrarSesion
+
+GET    /categoria
+GET    /categoria/activos
+GET    /categoria/inactivos
+GET    /categoria/:id
+POST   /categoria
+PUT    /categoria/:id
+PATCH  /categoria/:id/estado
+
+GET    /proveedor
+GET    /proveedor/activos
+GET    /proveedor/buscar
+GET    /proveedor/:id
+POST   /proveedor
+PUT    /proveedor/:id
+PATCH  /proveedor/:id/estado
+
+GET    /cliente
+GET    /cliente/activos
+GET    /cliente/buscar
+GET    /cliente/:id
+POST   /cliente
+PUT    /cliente/:id
+PATCH  /cliente/:id/estado
+
+GET    /metodopago
+GET    /metodopago/activos
+GET    /metodopago/:id
+POST   /metodopago
+PUT    /metodopago/:id
+PATCH  /metodopago/:id/estado
+
+GET    /producto
+GET    /producto/activos
+GET    /producto/sugerencias
+GET    /producto/buscar
+GET    /producto/codigo/:codigo
+GET    /producto/:id
+POST   /producto
+PUT    /producto/:id
+PATCH  /producto/:id/estado
+
+GET    /compra
+GET    /compra/:id
+POST   /compra
+PATCH  /compra/:id/estado
+
+GET    /venta
+GET    /venta/:id
+POST   /venta
+PATCH  /venta/:id/estado
+
+GET    /inventario
+GET    /inventario/producto/:id
+GET    /inventario/estados
+GET    /inventario/estados/:id
+
+GET    /operacion
+POST   /operacion
+
+POST   /notificacion/enviar
 ```
 
----
+## Autenticacion
 
-# Objetivos del Proyecto
+Las rutas protegidas usan Firebase Authentication. El backend valida el ID token con Firebase Admin y luego busca el usuario en la tabla `usuarios` mediante `firebase_uid`.
 
-* Implementar una arquitectura backend escalable
-* Aplicar buenas prácticas de desarrollo
-* Mejorar el rendimiento y organización del código
-* Desarrollar una API mantenible para aplicaciones empresariales
-* Fortalecer conocimientos en Node.js y PostgreSQL
+Si el usuario no existe, esta inhabilitado o el token no es valido, la API responde con errores `401` o `403`.
 
----
+## Notificaciones
 
-# Aprendizajes Aplicados
+El proyecto incluye:
 
-Durante el desarrollo del proyecto se aplicaron conceptos relacionados con:
+- Registro de tokens FCM por usuario.
+- Envio de notificaciones push.
+- Cron diario a las **6:00 AM** en zona horaria `America/Lima`.
+- Revision de tiendas activas para alertas relacionadas con lotes criticos.
 
-* Arquitectura backend
-* Diseño de APIs REST
-* Gestión de autenticación
-* Manejo de middlewares
-* Optimización de consultas SQL
-* Separación de responsabilidades
-* Seguridad backend
-* Organización modular
+## Validaciones y Errores
 
----
+- Las entradas se validan con Zod desde `src/validators`.
+- Los errores se centralizan con middlewares y utilidades en `src/utils`.
+- Las respuestas mantienen una estructura consistente con `success`, `message` y datos cuando corresponde.
 
-# Estado del Proyecto
+## Estado del Proyecto
 
-Proyecto en desarrollo y mejora continua.
+Proyecto en desarrollo como parte de la tesis. El backend ya cuenta con modulos funcionales para inventario, compras, ventas, administracion de entidades y notificaciones.
 
-Próximamente:
+Pendientes sugeridos:
 
-* Documentación Swagger
-* Docker
-* Testing
-* Logs avanzados
-* CI/CD
-* Deploy en servidor cloud
+- Documentacion Swagger/OpenAPI.
+- Pruebas automatizadas.
+- Dockerizacion.
+- Logs avanzados.
+- Pipeline CI/CD.
 
----
+## Autor
 
-# Autor
-
-Desarrollado por Jhordany Torres.
-
-Backend Developer | Software Developer
+Desarrollado por **Jhordany Torres**.

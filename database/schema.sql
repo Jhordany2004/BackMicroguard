@@ -79,9 +79,11 @@ CREATE TABLE categorias (
 
 CREATE TABLE clientes (
     id BIGSERIAL PRIMARY KEY,
+
     tienda_id BIGINT NOT NULL
     REFERENCES tiendas(id)
     ON DELETE RESTRICT,
+
     tipo_cliente VARCHAR(20) NOT NULL DEFAULT 'General',
     tipo_documento VARCHAR(10),
     documento VARCHAR(20),
@@ -103,8 +105,7 @@ CREATE TABLE clientes (
 
     CHECK (
         tipo_documento IS NULL
-        OR
-        tipo_documento IN (
+        OR tipo_documento IN (
             'DNI',
             'RUC'
         )
@@ -113,15 +114,21 @@ CREATE TABLE clientes (
     CHECK (
         (
             tipo_cliente = 'General'
+            AND tipo_documento IS NULL
+            AND documento IS NULL
         )
         OR
         (
             tipo_cliente = 'Natural'
+            AND tipo_documento = 'DNI'
+            AND documento IS NOT NULL
             AND nombres IS NOT NULL
         )
         OR
         (
             tipo_cliente = 'Empresa'
+            AND tipo_documento = 'RUC'
+            AND documento IS NOT NULL
             AND razon_social IS NOT NULL
         )
     ),
@@ -139,6 +146,7 @@ CREATE TABLE proveedores (
     tienda_id BIGINT NOT NULL
     REFERENCES tiendas(id)
     ON DELETE RESTRICT,
+
     tipo_proveedor VARCHAR(20) NOT NULL,
     tipo_documento VARCHAR(10) NOT NULL DEFAULT 'RUC',
     documento VARCHAR(20) NOT NULL,
@@ -160,6 +168,22 @@ CREATE TABLE proveedores (
             'DNI',
             'RUC',
             'CE'
+        )
+    ),
+
+    CHECK (
+        (
+            tipo_proveedor = 'Empresa'
+            AND tipo_documento = 'RUC'
+        )
+        OR
+        (
+            tipo_proveedor = 'Natural'
+            AND tipo_documento IN (
+                'DNI',
+                'RUC',
+                'CE'
+            )
         )
     ),
 
@@ -470,6 +494,10 @@ ON tokens_fcm(usuario_id);
 
 CREATE INDEX idx_productos_tienda_perecible
 ON productos (tienda_id, estado, perecible);
+
+CREATE UNIQUE INDEX uq_clientes_general_por_tienda
+ON clientes (tienda_id)
+WHERE tipo_cliente = 'General';
 
 -- =====================================================
 -- BY: Jhordany Torres
