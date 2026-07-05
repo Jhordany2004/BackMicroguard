@@ -8,8 +8,6 @@ const formatCustomer = (customer) => ({
     tipoCliente: customer.tipo_cliente,
     tipoDocumento: customer.tipo_documento,
     documento: customer.documento,
-    nombres: customer.nombres,
-    apellidos: customer.apellidos,
     nombre: customer.nombres,
     apellido: customer.apellidos,
     razonSocial: customer.razon_social,
